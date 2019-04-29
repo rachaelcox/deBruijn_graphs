@@ -1,0 +1,108 @@
+---
+title: "make_node_colors"
+author: "Rachael M. Cox"
+date: "4/25/2019"
+output: html_document
+---
+
+```{r setup}
+library(tidyverse)
+library(RColorBrewer)
+library(colorspace)
+
+setwd("/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/node_files/")
+```
+
+
+```{r }
+
+# specify node file, color gradient ---------------------------------------
+
+node_df <- read_csv("actin-rhodopsin_orthogroups_nodes_7mer_allproteins_uniques.csv")
+
+num_edges = count(node_df, c("Node1"))$n
+highest_prot_count = max(node_df$ProteinCount, na.rm=TRUE)
+
+colfunc <- colorRampPalette(c("light grey", "red","yellow"))
+
+# color by edge protein count ---------------------------------------
+
+palette <- colfunc(highest_prot_count)
+swatchplot(palette)
+
+palette_LGL_format <- as_tibble(t(col2rgb(palette))) %>%
+      rownames_to_column() %>%
+      mutate(red = red/255) %>%
+      mutate(green = green/255) %>%
+      mutate(blue = blue/255) %>% 
+      rename(ProteinCount = rowname) %>% 
+      mutate(ProteinCount = as.numeric(ProteinCount))
+
+color_protcount_table <- node_df %>%
+  left_join(palette_LGL_format, by=c("ProteinCount"))
+
+color_file_protcount_actin-rhodopsin <- color_protcount_table %>% 
+  select(Node1, Node2, red, green, blue)
+  
+write_csv(color_file_protcount_actin-rhodopsin, "/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/color_file_protcount_actin-rhodopsin.txt")
+
+```
+
+```{r}
+# specify node file, color gradient ---------------------------------------
+
+node_df <- read_delim("../LGL_files/actin_orthogroup_nodes_7mer_allproteins_lgl.ncol")
+
+num_edges = count(node_df, c("Node1"))$n
+highest_prot_count = max(node_df$ProteinCount, na.rm=TRUE)
+
+colfunc <- colorRampPalette(c("light grey", "red","yellow"))
+
+# color by edge protein count ---------------------------------------
+
+palette <- colfunc(highest_prot_count)
+swatchplot(palette)
+
+palette_LGL_format <- as_tibble(t(col2rgb(palette))) %>%
+      rownames_to_column() %>%
+      mutate(red = red/255) %>%
+      mutate(green = green/255) %>%
+      mutate(blue = blue/255) %>% 
+      rename(ProteinCount = rowname) %>% 
+      mutate(ProteinCount = as.numeric(ProteinCount))
+
+color_protcount_table <- node_df %>%
+  left_join(palette_LGL_format, by=c("ProteinCount"))
+
+color_file_protcount <- color_protcount_table %>% 
+  select(Node1, Node2, red, green, blue)
+  
+write_csv(color_file_protcount_actin, "/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/color_file_protcount_actin.txt")
+
+```
+
+```{r }
+
+# color by position ---------------------------------------------
+
+node_df2 <- read_csv("collagen_orthogroup_nodes_7mer_allproteins_uniques.csv") %>% 
+  rownames_to_column()
+
+
+palette <- colfunc(num_edges)
+
+palette_LGL_format <- as_tibble(t(col2rgb(palette))) %>% rownames_to_column() %>%
+  mutate(red = red/255) %>%
+  mutate(green = green/255) %>%
+  mutate(blue = blue/255)
+
+color_position_table <- node_df2 %>% 
+  left_join(palette_LGL_format, by=c("rowname"))
+
+color_file_position_collagen <- color_position_table %>% 
+  select(Node1, Node2, red, green, blue)
+  
+write_csv(color_file_position_collagen, "/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/color_file_position_collagen.txt")
+
+```
+
