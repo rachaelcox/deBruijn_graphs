@@ -1,0 +1,383 @@
+---
+title: "speed_test_analysis"
+author: "Rachael M. Cox"
+output: html_document
+---
+```{r}
+
+library(tidyverse)
+library(ggplot2)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+library(gganimate)
+library(cowplot)
+library(colorspace)
+library(lubridate)
+library(plotly)
+
+```
+
+https://genomebiology.biomedcentral.com/track/pdf/10.1186/s13059-019-1755-7
+http://afproject.org/app/benchmark/genetree/swisstree/dataset/
+
+Speed tests:
+```{r}
+
+
+exp_details <- read_csv("exp_details.csv", col_names = c("family", "num_seqs")) 
+
+setwd('/project/rmcox/deBruijn_graphs/speed_tests/benchmark_fastas/')
+files = dir(pattern = "*_lengths.txt") # get file names
+
+
+lengths <- data_frame(filename = files) %>% # create a data frame
+                                         # holding the file names
+  mutate(file_contents = map(filename,          # read files into
+           ~ read_tsv(.))) %>%  # a new data column
+  unnest()
+
+
+
+
+
+setwd("/project/rmcox/deBruijn_graphs/speed_tests/results")
+files <- dir(pattern = "*_results.csv") # get file names
+
+custom_read_csv <- function(file){
+  a <- read_csv(file, col_names = c("family", "algorithm","raw_time"), col_types = cols(raw_time = col_character()))
+  print(a)
+  return(a)
+  
+}
+
+times <- files %>%
+  map(custom_read_csv) %>%    # read in all the files individually, using
+  reduce(rbind)        # reduce with rbind into one dataframe
+
+
+
+median_lengths <- lengths %>%
+  group_by(filename) %>%
+  summarize(
+    median_length = median(ProteinLength)
+  ) %>%
+  mutate(family = str_replace(filename, "_lengths.txt", "")) 
+
+
+
+
+#times %>%
+
+
+times_formatted <- times %>%
+    complete(family, algorithm) %>%
+    filter(!(algorithm == "UPP" & is.na(raw_time))) %>%
+    mutate(raw_time = case_when(is.na(raw_time) ~ '36:00:00',
+                                TRUE ~ raw_time) )%>%
+    mutate(dt = case_when(
+                          grepl("[.]", raw_time)  ~ lubridate::ms(raw_time),  # check warning message
+                          TRUE ~ lubridate::hms(raw_time))) %>%
+    mutate(seconds = lubridate::period_to_seconds(dt)) %>%
+    mutate(minutes = seconds/60) %>%
+  
+   left_join(exp_details, by = "family") %>%
+  left_join(median_lengths, by = "family") %>%
+  mutate(seq_len_prod = minutes*median_length)
+
+  
+
+          
+ordering <- c("deBruijn",  "Clustal-Omega", "MAFFT",  "UPP",  "Kalign", "Muscle" )
+
+times_formatted  %>%
+  ggplot(aes(x = num_seqs, y = median_length))+ 
+     geom_point()
+
+# THIS plot
+times_formatted_plot <- times_formatted %>%
+
+  ggplot() +
+  geom_jitter(size=3.5, width = 0.01,  alpha = 0.95,  aes(x = fct_relevel(algorithm, ordering), y = minutes, group = family, color = num_seqs)) + 
+  scale_color_viridis(name = "Number\nof sequences") +
+  geom_hline(yintercept = 2160, linetype = "dashed") +
+  xlab("Method") +
+  ylab("Time to completion (minutes)") +
+  theme(legend.position = c(0.1,0.5),
+        axis.title.x = element_blank()) + 
+  theme(axis.text.x = element_text(angle = 45, vjust =1, hjust =1)) +
+  geom_label(x = 1.5, y = 2160, label = "Run terminated") +
+  NULL 
+
+
+times_formatted_plot %>% 
+  ggsave("times_formatted_plot.pdf", ., device = "pdf", height = 5, width = 5, units = "in")
+times_formatted_plot %>% 
+  ggsave("times_formatted_plot.png", ., device = "png", height = 5, width = 5, units = "in")
+
+
+# Inset this plot
+times_formatted %>%
+  filter(algorithm %in% c("deBruijn",  "Clustal-Omega", "MAFFT")) %>% 
+
+  ggplot(aes(x = fct_relevel(algorithm, ordering), y = minutes, group = family, color = num_seqs)) +
+  geom_point(size=1) + 
+  geom_line()
+  theme(legend.title=element_blank()) +
+  scale_color_viridis() +
+
+ #scale_y_log10() +
+  xlab("Method") +
+  ylab("Time to completion (minutes)") +
+  NULL
+
+###############################################
+palette_OkabeIto <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#999999")
+palette_OkabeIto_rev <- rev(c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#999999"))
+
+cbbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#CC79A7")
+cbbPalette_rev <- rev(c("#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#CC79A7"))
+
+times_trunc <- times_formatted %>%
+  filter(!grepl("Kalign", algorithm)) %>%
+  filter(!grepl("Muscle", algorithm)) %>% 
+  filter(!grepl("UPP", algorithm))
+
+times_seqtrunc <- times_formatted %>%
+  filter(num_seqs > 10000) %>%
+  filter(!grepl("Kalign", algorithm)) %>%
+  filter(!grepl("Muscle", algorithm))
+
+###############################################
+
+##### line graphs #####
+# time vs num seqs (all)
+times_formatted %>%
+  ggplot(aes(x  = num_seqs, y = minutes, 
+             group = fct_relevel(algorithm,ordering), 
+             color = fct_relevel(algorithm,ordering))) +
+  geom_line() +
+  xlab("Number of sequences aligned at once") +
+  ylab("Time to completion (minutes)") +
+  scale_colour_manual(values=cbbPalette_rev) +
+  theme(legend.position = c(0.7,0.8), legend.title=element_blank()) +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_continuous(expand = c(0,0))
+
+# num_seqs vs time (all)
+#times_formatted %>%
+#  ggplot(aes(x  = minutes, y = num_seqs, 
+#             group = fct_relevel(algorithm,ordering), 
+#             color = fct_relevel(algorithm,ordering))) +
+#  geom_line() +
+#  ylab("Number of sequences aligned at once") +
+#  xlab("Time to completion (minutes)") +
+#  scale_colour_manual(values=cbbPalette_rev) +
+#  theme(legend.position = c(0.6,0.9), legend.title=element_blank())
+
+# time vs product of num_seqs and median_length (all)
+#times_formatted %>%
+#  ggplot(aes(x  = seq_len_prod, y = minutes, 
+#             group = fct_relevel(algorithm,ordering), 
+#             color = fct_relevel(algorithm,ordering))) +
+#  geom_line() +
+#  xlab("Number X median length of sequences aligned") +
+#  ylab("Time to completion (minutes)") +
+#  scale_colour_manual(values=cbbPalette_rev) +
+#  theme(legend.position = c(0.7,0.5), legend.title=element_blank())
+
+# product of num_seqs and median_length vs time (all)
+#times_formatted %>%
+#  ggplot(aes(x  = minutes, y = seq_len_prod, 
+#             group = fct_relevel(algorithm,ordering), 
+#             color = fct_relevel(algorithm,ordering))) +
+#  geom_line() +
+#  ylab("Number X median length of sequences aligned") +
+#  xlab("Time to completion (minutes)") +
+#  scale_colour_manual(values=cbbPalette_rev) +
+#  theme(legend.position = c(0.6,0.9), legend.title=element_blank())
+
+# top most performing
+times_trunc %>%
+  ggplot(aes(x  = num_seqs, y = minutes, 
+             group = fct_relevel(algorithm,ordering), 
+             color = fct_relevel(algorithm,ordering))) +
+  geom_line() +
+  xlab("Number of sequences aligned at once") +
+  ylab("Time to completion (minutes)") +
+  scale_colour_manual(values=cbbPalette_rev) +
+  theme(legend.position = c(0.7,0.8), legend.title=element_blank()) +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_continuous(expand = c(0,0))
+
+times_trunc %>%
+  ggplot(aes(x  = minutes, y = num_seqs, 
+             group = fct_relevel(algorithm,ordering), 
+             color = fct_relevel(algorithm,ordering))) +
+  geom_line() +
+  ylab("Number of sequences aligned at once") +
+  xlab("Time to completion (minutes)") +
+  scale_colour_manual(values=cbbPalette) +
+  theme(legend.position = c(0.6,0.9), legend.title=element_blank())
+
+# only the large datasets, excluding Muscle & Kalign
+times_seqtrunc %>%
+  ggplot(aes(x  = num_seqs, y = minutes, 
+             group = fct_relevel(algorithm,ordering), 
+             color = fct_relevel(algorithm,ordering))) +
+  geom_line() +
+  xlab("Number of sequences aligned at once") +
+  ylab("Time to completion (minutes)") +
+  scale_colour_manual(values=cbbPalette) +
+  theme(legend.position = c(0.6,0.9), legend.title=element_blank())
+
+times_seqtrunc %>%
+  ggplot(aes(x  = median_length, y = minutes, 
+             group = fct_relevel(algorithm,ordering), 
+             color = fct_relevel(algorithm,ordering))) +
+  geom_line() +
+  xlab("Median length of sequences aligned at once") +
+  ylab("Time to completion (minutes)") +
+  scale_colour_manual(values=cbbPalette) +
+  theme(legend.position = c(0.6,0.9), legend.title=element_blank())
+  
+  #facet_wrap(~algorithm, ncol=2)
+  #facet_wrap(~algorithm, scales = "free_y")
+
+##### scatter plots ######
+# time vs num seqs (all)
+times_formatted %>%
+  ggplot(aes(x  = num_seqs, y = minutes, 
+             group = fct_relevel(algorithm,ordering), 
+             color = fct_relevel(algorithm,ordering))) +
+  geom_point() +
+  xlab("Number of sequences aligned at once") +
+  ylab("Time to completion (minutes)") +
+  scale_colour_manual(values=cbbPalette_rev) +
+  theme(legend.title=element_blank()) +
+  facet_wrap(~algorithm, scales = "free_y")
+
+# num_seqs vs time (all)
+times_formatted %>%
+  ggplot(aes(x  = minutes, y = num_seqs, 
+             group = fct_relevel(algorithm,ordering), 
+             color = fct_relevel(algorithm,ordering))) +
+  geom_point() +
+  ylab("Number of sequences aligned at once") +
+  xlab("Time to completion (minutes)") +
+  scale_colour_manual(values=cbbPalette_rev) +
+  theme(legend.title=element_blank()) +
+  facet_wrap(~algorithm, scales = "free_y")
+
+# time vs product of num_seqs and median_length (all)
+times_formatted %>%
+  ggplot(aes(x  = seq_len_prod, y = minutes, 
+             group = fct_relevel(algorithm,ordering), 
+             color = fct_relevel(algorithm,ordering))) +
+  geom_point() +
+  xlab("Number X median length of sequences aligned") +
+  ylab("Time to completion (minutes)") +
+  scale_colour_manual(values=cbbPalette_rev) +
+  theme(legend.position = c(0.7,0.5), legend.title=element_blank())
+
+# product of num_seqs and median_length vs time (all)
+times_formatted %>%
+  ggplot(aes(x  = minutes, y = seq_len_prod, 
+             group = fct_relevel(algorithm,ordering), 
+             color = fct_relevel(algorithm,ordering))) +
+  geom_point() +
+  ylab("Number X median length of sequences aligned") +
+  xlab("Time to completion (minutes)") +
+  scale_colour_manual(values=cbbPalette_rev) +
+  theme(legend.position = c(0.6,0.9), legend.title=element_blank())
+
+
+###################################################
+
+
+table_format <- times_formatted %>%
+  select(family, algorithm, minutes, num_seqs) %>% 
+  spread(algorithm, minutes) %>%
+  arrange(desc(num_seqs)) %>%
+  write_csv("all_combined_formatted.csv")
+
+```
+
+Consensus sequence tests:
+
+``` {r }
+
+setwd("/project/rmcox/deBruijn_graphs/consensus_tests/results")
+files <- dir(pattern = "*_results.csv") # get file names
+
+custom_read_csv_cons <- function(file){
+  a <- read_csv(file, col_names = c("type", "clustalo_length", "cutoff", "perc_id", "family"))
+  print(a)
+  return(a)
+  
+}
+
+consensus_scores <- files %>%
+  map(custom_read_csv_cons) %>%    # read in all the files individually, using
+  reduce(rbind)        # reduce with rbind into one dataframe
+
+dBg_consensus_lengths <- read_csv("dBg_consensus_lengths.csv", col_names = FALSE) %>%
+  rename(dBg_length = X2) %>% 
+  mutate(family = str_extract(X1, '(.*)(?=_dBg)')) %>%
+  select(-X1)
+   
+
+consensus_scores_naive <- consensus_scores %>%
+  mutate(type = str_extract(type, "naive")) %>%
+  na.omit() %>%
+  #summarize(avg_similarity = mean(perc_id))
+  left_join(median_lengths, by=c("family")) %>%
+  select(-filename) %>%
+  spread(cutoff, perc_id) %>%
+  left_join(dBg_consensus_lengths, by=c("family"))
+
+consensus_scores_gapped <- consensus_scores %>%
+  mutate(type = str_extract(type, "gapped")) %>%
+  na.omit() %>%
+  #summarize(avg_similarity = mean(perc_id))
+  left_join(median_lengths, by=c("family")) %>%
+  select(-filename) %>%
+  spread(cutoff, perc_id) %>%
+  left_join(dBg_consensus_lengths, by=c("family"))
+
+
+consensus_scores_naive %>% write_csv("dBg_vs_clustal_consensus_results.csv")
+
+
+```
+
+
+Scratch
+sel_complete <- times_formatted %>% filter(algorithm == "KALIGN")
+
+times_formatted %>% filter(!family %in% sel_complete$family) %>% select(family) %>% unique %>% write_csv("KALIGN_DNF.txt")
+
+
+```
+
+
+```{r}
+dat <- tibble(x=rnorm(100), y=rnorm(100), time=1:100) 
+dat %>% 
+  ggplot()  + 
+  geom_point(aes(x=x, y=y)) +
+  geom_point(aes(x=x, y=y), shape=4, size=10) +
+  transition_time(time) + 
+  shadow_mark(exclude_layer=0)
+
+
+palette_OkabeIto_black <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")
+colorblocks <- c("#FF0000","#0072B2","#E69F00","#009E24", "#979797","#5530AA", "#111111")
+colors_key <- c("Red", "Blue", "Orange","Green",  "Grey", "Purple","Black") 
+palette <- rep(colorblocks, 20)
+
+palette_OkabiIto_custom <- c("#009E73", "#56B4E9", "#F0E442", "firebrick3")
+palette_OkabeIto <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#999999")
+
+```
+

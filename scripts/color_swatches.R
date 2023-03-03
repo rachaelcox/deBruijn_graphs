@@ -2,10 +2,9 @@ library(tidyverse)
 library(RColorBrewer)
 library(colorspace)
 
-colfunc <- colorRampPalette(c("dark blue", "light green", "white"))
+colfunc <- colorRampPalette(c("lightgoldenrodyellow","#009E73"))
 
-
-palette <- colfunc(2000)
+palette <- colfunc(5)
 swatchplot(palette)
 
 palette_LGL_format <- as_tibble(t(col2rgb(palette))) %>% rownames_to_column() %>%

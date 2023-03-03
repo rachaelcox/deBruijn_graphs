@@ -1,0 +1,299 @@
+---
+title: "DBG motif analysis"
+author: "Rachael M. Cox"
+date: "5/19/2020"
+output: html_document
+---
+
+```{r global options}
+
+library(knitr)
+opts_chunk$set(fig.align = "center", fig.height = 5, fig.width = 6)
+library(tidyverse)
+theme_set(theme_bw(base_size = 12))
+library(janitor) # clean_names() function
+library(VennDiagram)
+library(ggthemes) # scale_color_colorblind() gglayer
+library(skimr) # skim() function
+library(colorspace) # swatchplot() function
+`%!in%` = Negate(`%in%`)
+
+setwd('/project/rmcox/deBruijn_graphs/')
+
+palette_pretty <- c("#0072B2","#E69F00","#009E24","#FF0000", "#979797","#5530AA")
+swatchplot(palette_pretty)
+palette_cb <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", 
+  "#0072B2", "#D55E00", "#CC79A7", "#999999")
+swatchplot(palette_cb)
+
+```
+
+```{r }
+
+set.seed(13)
+
+# filter blast results from BLASTing whole fasta down to top 100 (out of 2400)
+fasta_data <- read_csv("motif_analysis/blast_results/archive/wholefasta_nr.csv",
+                       col_names = FALSE) %>% 
+  rename(experiment = X1, accession = X2, perc_id = X3, len_overlap = X4,
+           num_mismatch = X5, num_gaps = X6, query_start = X7, query_end = X8,
+           hit_start = X9, hit_end = X10, e_val = X11, bit_score = X12) %>%
+  #mutate(accession = str_extract(accession, '(.*)(?=\\.\\d)')) %>% # apparently there aren't any ref seqs in the hit table
+  #filter(accession %!in% ref_id_mapping$genbank) %>%               # leaving this code here in case I'm wrong
+  arrange(desc(bit_score), e_val, desc(num_gaps), desc(perc_id)) %>%
+  filter(between(row_number(), 1, 1110)) %>% # sample top 100 hits
+  sample_n(100) %>% # randomly sample
+  mutate(experiment = "Reference_FASTA")
+  
+# create dataframe containing blast results for all searches
+path <- "motif_analysis/blast_results"
+
+nr_files <- dir(path, pattern = "*_nr.csv")
+nr_files
+
+nr_blast <- nr_files %>%
+  map(~ read_csv(file.path(path, .), col_names = FALSE)) %>%
+  reduce(rbind) %>%
+  rename(experiment = X1, accession = X2, perc_id = X3, len_overlap = X4,
+         num_mismatch = X5, num_gaps = X6, query_start = X7, query_end = X8,
+         hit_start = X9, hit_end = X10, e_val = X11, bit_score = X12) %>%
+  bind_rows(fasta_data)
+nr_blast
+
+# accessions for previously-selected proteins
+current_candidates <- read_delim("motif_analysis/prot_cands_052020.txt", 
+                                 delim = "\n", col_names = FALSE)
+
+# map reference seqs to genbank IDs
+ref_id_mapping <- read_tsv("motif_analysis/petase_id_mapping.txt")
+
+# map genbank IDs to uniprot IDs for annotation
+nr_blast %>%
+  select(accession) %>% 
+  write_delim("motif_analysis/blast_results/blast_gb_ids.txt",
+              delim = "\n", col_names = FALSE)
+
+```
+
+```{r }
+
+p <- nr_blast %>%
+  filter(experiment != "Raghav") %>%
+  ggplot(aes(x = bit_score, fill = experiment)) +
+    geom_density(alpha = 0.5) +
+    scale_x_log10() +
+    scale_fill_manual(values = palette_pretty)
+p
+p %>% ggsave("figures/dbg_comp_bitscores.tiff", ., device = "tiff", 
+         width = 8, height = 6, units = "in")
+
+```
+
+```{r }
+
+dbg_hits <- nr_blast %>%
+  filter(experiment == "DBG_7mer_Consensus") %>%
+  select(accession)
+
+ref_hits <- nr_blast %>%
+  filter(experiment == "Reference_FASTA") %>%
+  select(accession)
+
+meme_hits <- nr_blast %>%
+  filter(experiment == "MEME_Suite_Motif") %>%
+  select(accession)
+
+ragh_hits <- nr_blast %>%
+  filter(experiment == "Raghav") %>%
+  select(accession)
+
+```
+
+```{r }
+
+overlap <- calculate.overlap(x = list("DBG_7mer_Consensus" = dbg_hits$accession,
+                                  "Reference_FASTA" = ref_hits$accession,
+                                  "MEME_Suite_Motif" = meme_hits$accession))
+overlap
+
+grid.newpage()
+venn.plot <- draw.triple.venn(area1 = length(dbg_hits$accession), 
+                              area2 = length(ref_hits$accession),
+                              area3 = length(meme_hits$accession), 
+                              n12 = length(overlap$a2) + length(overlap$a5),
+                              n23 = length(overlap$a6) + length(overlap$a5),
+                              n13 = length(overlap$a4) + length(overlap$a5), 
+                              n123 = length(overlap$a5), 
+                              category = c("DBG_Consensus",
+                                           "Reference_FASTA",
+                                           "MEME_Suite"),
+                 lty = "blank", lwd = 2, cex = 1.5,
+                 euler.d = TRUE, scaled = TRUE, cat.prompts = TRUE,
+                 fill = c("#0072B2", "#009E24", "#E69F00"), alpha = 0.3,
+                 fontface = "bold", fontfamily = "sans",
+                 cat.fontfamily = "sans", cat.cex = 1,
+                 cat.default.pos = 'outer')
+grid.draw(venn.plot)
+venn.plot %>% ggsave("figures/dbg_comp_venn.tiff", ., device = "tiff", 
+         width = 8.25, height = 6, units = "in")
+
+```
+
+```{r }
+
+# overlap <- calculate.overlap(x = list("DBG_7mer_Consensus" = dbg_hits$accession,
+#                                   "Raghav_Code" = ragh_hits$accession,
+#                                   "MEME_Suite_Motif" = meme_hits$accession))
+# overlap
+# 
+# grid.newpage()
+# venn.plot <- draw.triple.venn(area1 = length(dbg_hits$accession), 
+#                               area2 = length(ragh_hits$accession),
+#                               area3 = length(meme_hits$accession), 
+#                               n12 = length(overlap$a2) + length(overlap$a5),
+#                               n23 = length(overlap$a6) + length(overlap$a5),
+#                               n13 = length(overlap$a4) + length(overlap$a5), 
+#                               n123 = length(overlap$a5), 
+#                               category = c("DBG_Consensus",
+#                                            "Raghav_Code",
+#                                            "MEME_Suite"),
+#                  lty = "blank", lwd = 2, cex = 1.5,
+#                  euler.d = TRUE, scaled = TRUE, cat.prompts = TRUE,
+#                  fill = c("#0072B2", "#E69F00", "#009E24"), alpha = 0.2,
+#                  fontface = "bold", fontfamily = "sans",
+#                  cat.fontfamily = "sans")
+# grid.draw(venn.plot)
+
+```
+
+
+```{r }
+
+test <- read_csv("motif_analysis/test.csv") %>%
+  unique() %>%
+  mutate(seq_length = str_length(sequence))
+
+prot_counts <- nr_blast %>% 
+  left_join(test) %>%
+  mutate_if(is.character, str_to_lower) %>%
+  mutate(protein = str_remove(protein, ' \\d')) %>% 
+  mutate(protein = str_remove(protein, ' family protein')) %>%
+  group_by(experiment, protein) %>%
+  tally()
+
+p <- prot_counts %>%
+  filter(experiment != "raghav") %>% 
+    ggplot(aes(x = protein, y = n, fill = experiment)) +
+      geom_col(position = "dodge") +
+      geom_text(aes(label = n), hjust = 1, color = "white", size = 3) +
+      facet_wrap(~experiment, nrow = 1) +
+      scale_fill_manual(values = palette_pretty) +
+      ylab("count") +
+      xlab("protein family") +
+      ggtitle("top 100 proteins, family distribution") +
+      coord_flip()
+p
+p %>% ggsave("figures/dbg_comp_prots.tiff", ., device = "tiff", 
+         width = 8, height = 4, units = "in")
+
+org_counts <- nr_blast %>% 
+  left_join(test) %>%
+  mutate_if(is.character, str_to_lower) %>%
+  mutate(protein = str_remove(protein, ' \\d')) %>% 
+  mutate(protein = str_remove(protein, ' family protein')) %>%
+  mutate(organism = str_remove(organism, ' .*')) %>% 
+  group_by(experiment, organism) %>%
+  tally()
+
+p <- org_counts %>% 
+  filter(experiment != "raghav") %>%
+    ggplot(aes(x = organism, y = n, fill = experiment)) +
+      geom_col(position = position_dodge2(width = 0.9, preserve = "single")) +
+      geom_text(aes(label = n), hjust = 1, color = "white", size = 3) +
+      theme(axis.title.y = element_blank()) +
+      facet_wrap(~experiment, nrow = 1) +
+      scale_fill_manual(values = palette_pretty) +
+      ylab("count") +
+      xlab("species genera") +
+      ggtitle("top 100 proteins, species distribution") +
+      coord_flip()
+p
+p %>% ggsave("figures/dbg_comp_orgs.tiff", ., device = "tiff", 
+         width = 8, height = 4, units = "in")
+  
+```
+
+```{r }
+
+unique <- c(overlap$a1, overlap$a3, overlap$a7)
+
+unique_hits <- nr_blast %>%
+  filter(experiment != "Raghav") %>%
+  filter(accession %in% unique) %>% 
+  left_join(test) %>%
+  mutate_if(is.character, str_to_lower) %>%
+  mutate(protein = str_remove(protein, ' \\d')) %>% 
+  mutate(protein = str_remove(protein, ' family protein')) %>%
+  mutate(organism = str_remove(organism, ' .*'))
+  
+p <- unique_hits %>%
+  group_by(experiment, protein) %>%
+    tally() %>%
+  ggplot(aes(x = protein, y = n, fill = experiment)) +
+    geom_col(position = position_dodge2(width = 0.9, preserve = "single")) +
+    geom_text(aes(label = n), hjust = 1, color = "white", size = 3) +
+    theme(axis.title.y = element_blank()) +
+    facet_wrap(~experiment) +
+    scale_fill_manual(values = palette_pretty) +
+    ylab("count") +
+    xlab("protein family") +
+    ggtitle("unique proteins, family distribution") +
+    coord_flip()
+p
+p %>% ggsave("figures/dbg_comp_prots_uniq.tiff", ., device = "tiff", 
+         width = 8, height = 4, units = "in")
+
+
+p <- unique_hits %>%
+  group_by(experiment, organism) %>%
+    tally() %>%
+  ggplot(aes(x = organism, y = n, fill = experiment)) +
+    geom_col(position = position_dodge2(width = 0.9, preserve = "single")) +
+    geom_text(aes(label = n), hjust = 1, color = "white", size = 3) +
+    theme(axis.title.y = element_blank()) +
+    facet_wrap(~experiment) +
+    scale_fill_manual(values = palette_pretty) +
+    ylab("count") +
+    xlab("species genera") +
+    ggtitle("unique proteins, species distribution") +
+    coord_flip()
+p
+p %>% ggsave("figures/dbg_comp_orgs_uniq.tiff", ., device = "tiff", 
+         width = 8, height = 4, units = "in")
+
+```
+
+```{r }
+
+all_hits <- nr_blast %>%
+  left_join(test)
+
+p <- all_hits %>% 
+  filter(experiment != "Raghav") %>% 
+  ggplot(aes(x = seq_length, fill = experiment)) +
+    geom_density(alpha = 0.5) +
+    ggtitle("top 100 proteins, sequence length distribution") +
+    scale_fill_manual(values = palette_pretty)
+p
+p %>% ggsave("figures/dbg_comp_seqlen.tiff", ., device = "tiff", 
+         width = 6, height = 3, units = "in")
+
+p <- unique_hits %>%
+  ggplot(aes(x = seq_length, fill = experiment)) +
+    geom_density(alpha = 0.5) +
+    ggtitle("unique proteins, sequence length distribution") +
+    scale_fill_manual(values = palette_pretty)
+p
+p %>% ggsave("figures/dbg_comp_seqlen_uniq.tiff", ., device = "tiff", 
+         width = 6, height = 3, units = "in")
+```

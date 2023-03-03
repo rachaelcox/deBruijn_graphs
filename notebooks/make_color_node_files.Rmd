@@ -9,54 +9,73 @@ output: html_document
 library(tidyverse)
 library(RColorBrewer)
 library(colorspace)
+library(colorvalues)
 
 setwd("/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/node_files/")
 ```
 
+```{r}
 
-```{r }
+node_df <- read_csv("/project/rmcox/LECA/ms/cfms2/qc/eunog_lgl/leca_eunogs_many2many.counts.csv")
+counts <- node_df %>%
+  select_if(is.numeric)
+names(counts)
 
-# specify node file, color gradient ---------------------------------------
-
-node_df <- read_csv("actin-rhodopsin_orthogroups_nodes_7mer_allproteins_uniques.csv")
-
-num_edges = count(node_df, c("Node1"))$n
-highest_prot_count = max(node_df$ProteinCount, na.rm=TRUE)
-
-colfunc <- colorRampPalette(c("light grey", "red","yellow"))
-
-# color by edge protein count ---------------------------------------
-
-palette <- colfunc(highest_prot_count)
-swatchplot(palette)
-
-palette_LGL_format <- as_tibble(t(col2rgb(palette))) %>%
-      rownames_to_column() %>%
-      mutate(red = red/255) %>%
-      mutate(green = green/255) %>%
-      mutate(blue = blue/255) %>% 
-      rename(ProteinCount = rowname) %>% 
-      mutate(ProteinCount = as.numeric(ProteinCount))
-
-color_protcount_table <- node_df %>%
-  left_join(palette_LGL_format, by=c("ProteinCount"))
-
-color_file_protcount_actin-rhodopsin <- color_protcount_table %>% 
-  select(Node1, Node2, red, green, blue)
+color_by_weight <- function(node_file, palette, outdir, outfile){
   
-write_csv(color_file_protcount_actin-rhodopsin, "/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/color_file_protcount_actin-rhodopsin.txt")
+  node_df <- read_csv(node_file)
+  num_edges <- nrow(node_df)
+  counts <- select_if(node_df, is.numeric)
+  count_col <- names(counts)
+  highest_prot_count <- do.call(max, select_if(node_df, is.numeric))
+
+  
+  if(palette == "warm"){
+    colfunc <- colorRampPalette(rev(c("#440154FF","deeppink4","firebrick1","indianred1","lightgrey")))
+  } else if(palette == "cool") {
+    colfunc <- colorRampPalette(rev(c("#440154FF","#482677FF","#238A8DFF","lightseagreen","lightgrey")))
+  } else {
+    colfunc <- colorRampPalette(rev(c("#440154FF","#482677FF","#238A8DFF","#73D055FF","#FDE72500","papayawhip")))
+  }
+  
+  palette <- colfunc(highest_prot_count)
+
+  palette_lgl_format <- as_tibble(t(col2rgb(palette))) %>%
+    rownames_to_column() %>%
+    mutate(red = red/255) %>%
+    mutate(green = green/255) %>%
+    mutate(blue = blue/255) %>% 
+    mutate(rowname = as.numeric(rowname)) 
+  
+  # this get an error, need to fix
+  color_count_table <- node_df %>%
+    left_join(palette_lgl_format, by=c( = "rowname"))
+
+  color_df <- color_count_table %>% 
+    select(Node1, Node2, red, green, blue)
+  
+  write_csv(color_file_protcount, sprintf("%s.csv", outfile_prefix))
+
+  }
 
 ```
 
 ```{r}
-# specify node file, color gradient ---------------------------------------
+# specify unique node file, specify color gradient ---------------------------------------
 
-node_df <- read_delim("../LGL_files/actin_orthogroup_nodes_7mer_allproteins_lgl.ncol")
+node_df <- read_csv("myosin_orthogroup_nodes_7mer_allproteins_uniques.csv")
 
-num_edges = count(node_df, c("Node1"))$n
+num_edges = nrow(node_df)
 highest_prot_count = max(node_df$ProteinCount, na.rm=TRUE)
 
-colfunc <- colorRampPalette(c("light grey", "red","yellow"))
+## warm color ramp
+#colfunc <- colorRampPalette(rev(c("#440154FF","deeppink4","firebrick1","indianred1","lightgrey")))
+
+## cool color ramp
+#colfunc <- colorRampPalette(rev(c("#440154FF","#482677FF","#238A8DFF","lightseagreen","lightgrey")))
+
+## viridis color ramp
+colfunc <- colorRampPalette(rev(c("#440154FF","#482677FF","#238A8DFF","#73D055FF","#FDE72500","papayawhip")))
 
 # color by edge protein count ---------------------------------------
 
@@ -77,7 +96,63 @@ color_protcount_table <- node_df %>%
 color_file_protcount <- color_protcount_table %>% 
   select(Node1, Node2, red, green, blue)
   
-write_csv(color_file_protcount_actin, "/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/color_file_protcount_actin.txt")
+write_csv(color_file_protcount, "/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/color_file_protcount_myosin.txt")
+```
+
+```{r}
+
+```
+
+```{r}
+# specify unique node file & alphabetize, specify color gradient ---------------------------------------
+
+node_df <- read_csv("myosin_orthogroup_nodes_7mer_allproteins_uniques.csv")
+  
+node_lgl <- read_delim("../LGL_files/myosin_orthogroup_nodes_7mer_allproteins_lgl.ncol", " ", col_names=FALSE) %>% 
+  rename(Node1 = X1) %>% 
+  rename(Node2 = X2)
+
+num_edges = nrow(node_df)
+highest_prot_count = max(node_df$ProteinCount, na.rm=TRUE)
+
+node_df_ordered <- node_df %>%
+     mutate(alphNode1 = pmin(Node1, Node2), alphNode2 = pmax(Node1, Node2)) %>%
+     mutate(Node1 = alphNode1, Node2 = alphNode2) %>% 
+     select(-alphNode1, -alphNode2)
+
+## warm color ramp (for presentation/white background)
+#colfunc <- colorRampPalette(rev(c("#440154FF","deeppink4","firebrick1","indianred1","lightgrey")))
+
+## cool color ramp
+colfunc <- colorRampPalette(rev(c("#440154FF","#482677FF","#238A8DFF","lightseagreen","lightgrey")))
+
+## viridis color ramp (for high res images/black background)
+#colfunc <- colorRampPalette(c("#440154FF","#482677FF","#238A8DFF","#73D055FF","#FDE72500","papayawhip"))
+
+
+# color by edge protein count ---------------------------------------
+
+palette <- colfunc(highest_prot_count)
+swatchplot(palette)
+
+palette_LGL_format <- as_tibble(t(col2rgb(palette))) %>%
+      rownames_to_column() %>%
+      mutate(red = red/255) %>%
+      mutate(green = green/255) %>%
+      mutate(blue = blue/255) %>% 
+      rename(ProteinCount = rowname) %>% 
+      mutate(ProteinCount = as.numeric(ProteinCount))
+
+color_protcount_table <- node_df_ordered %>%
+  left_join(palette_LGL_format, by=c("ProteinCount"))
+
+lgl_protcount_colors <- node_lgl %>%
+  left_join(color_protcount_table, by=c("Node1","Node2"))
+
+color_file_protcount <- color_protcount_table %>% 
+  select(Node1, Node2, red, green, blue)
+  
+write_csv(color_file_protcount, "/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/color_file_protcount_myosin.txt")
 
 ```
 
@@ -85,7 +160,10 @@ write_csv(color_file_protcount_actin, "/stor/work/Marcotte/project/rmcox/deBruij
 
 # color by position ---------------------------------------------
 
-node_df2 <- read_csv("collagen_orthogroup_nodes_7mer_allproteins_uniques.csv") %>% 
+## work in progress
+## need to figure out how to separate protein edges N-term to C-term
+
+node_df2 <- read_csv("myosin_orthogroup_nodes_7mer_allproteins_uniques.csv") %>% 
   rownames_to_column()
 
 
@@ -99,10 +177,10 @@ palette_LGL_format <- as_tibble(t(col2rgb(palette))) %>% rownames_to_column() %>
 color_position_table <- node_df2 %>% 
   left_join(palette_LGL_format, by=c("rowname"))
 
-color_file_position_collagen <- color_position_table %>% 
+color_file_position_myosin <- color_position_table %>% 
   select(Node1, Node2, red, green, blue)
   
-write_csv(color_file_position_collagen, "/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/color_file_position_collagen.txt")
+write_csv(color_file_position_myosin, "/stor/work/Marcotte/project/rmcox/deBruijn_protein_maps/color_file_position_myosin.txt")
 
 ```
 
