@@ -5,17 +5,7 @@ import re
 import numpy as np
 np.random.seed(13)
 
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description="Calculates a consensus sequence for a deBruijn kmer file with unique kmers")
-    parser.add_argument("--input_file", action="store", required=True,
-                                        help="Filename for unique kmer edge list (.csv)")
-    inputs = parser.parse_args()
-    dBg_unique = inputs.input_file
-
-########################################################################
-# recursive function for growing kmer sequence in N-terminal direction
-########################################################################
+""" recursive function for growing kmer sequence in N-terminal direction """
 def grow_seq_n(seed_kmer, input_df, nterm_kmers=None, length=None, cons_seq_n=None):
     
     # if a list has not been passed as argument create an empty one
@@ -65,7 +55,7 @@ def grow_seq_n(seed_kmer, input_df, nterm_kmers=None, length=None, cons_seq_n=No
     # exit function and return consensus n-terminal kmers
     return cons_seq_n
 
-# function for recursively growing kmer sequence in N-terminal direction
+""" function for recursively growing kmer sequence in c-terminal direction """
 
 def grow_seq_c(seed_kmer, input_df, cterm_kmers=None, length=None):
 
@@ -122,38 +112,48 @@ def grow_seq_c(seed_kmer, input_df, cterm_kmers=None, length=None):
     # exit function and return consensus n-terminal kmers
     return cons_seq_c
 
-########################################################################
-# primary script
-########################################################################
+""" main """
 
-# read in file
-input_df = pd.read_csv(dBg_unique)
+def main()
 
-# find the most common edge for starting seeds
-most_common_edge = input_df['ProteinCount'] == input_df['ProteinCount'].max()
+    # read in file
+    dBg_unique = inputs.input_file
+    input_df = pd.read_csv(dBg_unique)
 
-# if more than one most common edge, randomly pick one
-seed_df = input_df[most_common_edge].sample(1)
+    # find the most common edge for starting seeds
+    most_common_edge = input_df['ProteinCount'] == input_df['ProteinCount'].max()
 
-# assign kmers as seeds & initialize the consensus list
-seed_kmer_1 = str(seed_df.iloc[0]['Node1'])
-seed_kmer_2 = str(seed_df.iloc[0]['Node2'])
+    # if more than one most common edge, randomly pick one
+    seed_df = input_df[most_common_edge].sample(1)
 
-# grow sequence recursively
-nterm_seq = grow_seq_n(seed_kmer_1, input_df)
-#print("nterm seq = {}\nlength = {}".format(nterm_seq,len(nterm_seq)))
-cterm_seq = grow_seq_c(seed_kmer_2, input_df)
-#print("cterm seq = {}\nlength = {}".format(cterm_seq,len(cterm_seq)))
+    # assign kmers as seeds & initialize the consensus list
+    seed_kmer_1 = str(seed_df.iloc[0]['Node1'])
+    seed_kmer_2 = str(seed_df.iloc[0]['Node2'])
 
-consensus_seq = nterm_seq+cterm_seq
-#print("\nthe consensus sequence (length {} aa) is: \n{}".\
-      #format(len(consensus_seq), consensus_seq))
+    # grow sequence recursively
+    nterm_seq = grow_seq_n(seed_kmer_1, input_df)
+    #print("nterm seq = {}\nlength = {}".format(nterm_seq,len(nterm_seq)))
+    cterm_seq = grow_seq_c(seed_kmer_2, input_df)
+    #print("cterm seq = {}\nlength = {}".format(cterm_seq,len(cterm_seq)))
 
-# format new file name & write consensus sequence to output
-writefile = dBg_unique.replace(".csv","")
-writename = re.match("(.*)(?=_)",dBg_unique).group()
+    consensus_seq = nterm_seq+cterm_seq
+    #print("\nthe consensus sequence (length {} aa) is: \n{}".\
+          #format(len(consensus_seq), consensus_seq))
 
-with open("{}.consensus.fasta".format(writefile),"w") as f:
-    f.write(">{} consensus sequence; length = {}\n".format(writename, len(consensus_seq)))
-    f.write(consensus_seq+"\n")
+    # format new file name & write consensus sequence to output
+    writefile = dBg_unique.replace(".csv","")
+    writename = re.match("(.*)(?=_)",dBg_unique).group()
+
+    with open("{}.consensus.fasta".format(writefile),"w") as f:
+        f.write(">{} consensus sequence; length = {}\n".format(writename, len(consensus_seq)))
+        f.write(consensus_seq+"\n")
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Calculates a consensus sequence for a deBruijn kmer file with unique kmers")
+    parser.add_argument("--input_file", action="store", required=True,
+                                        help="Filename for unique kmer edge list (.csv)")
+    inputs = parser.parse_args()
+    main()
+    
 
