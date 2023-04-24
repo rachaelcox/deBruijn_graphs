@@ -36,7 +36,7 @@ def unique(input_file):
 
 def main():
 
-    unique_kmer_file = unique(inputs.input_file)
+    unique_kmer_file = unique(args.input_file)
 
 if __name__ == "__main__":
     
@@ -46,5 +46,5 @@ if __name__ == "__main__":
     parser.add_argument("--sep", action="store", required=False, default=',',
                                         help="Column separator for input file, default=,")
     
-    inputs = parser.parse_args()
+    args = parser.parse_args()
     main()
