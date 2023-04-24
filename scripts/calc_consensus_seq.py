@@ -114,7 +114,7 @@ def grow_seq_c(seed_kmer, input_df, cterm_kmers=None, length=None):
 
 """ main """
 
-def main()
+def main():
 
     # read in file
     dBg_unique = inputs.input_file
