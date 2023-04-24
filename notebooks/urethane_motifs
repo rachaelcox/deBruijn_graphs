@@ -1,0 +1,12 @@
+# --------------------------------------
+# polyurethane degradation
+# motif extraction w/ DGBs
+# --------------------------------------
+
+# [4.24.23]
+
+python3 /project/rmcox/deBruijn_graphs/scripts/generate_deBruijn_kmers.py --input_fasta ${filename}.fasta --kmer_size $kmersize
+
+python3 /project/rmcox/deBruijn_graphs/scripts/collapse_kmer_uniques.py --input_file ${filename}_dBg_${kmersize}mers.csv
+
+python3 /project/rmcox/deBruijn_graphs/scripts/calc_consensus_seq.py --input_file ${filename}_dBg_${kmersize}mers_unique.csv

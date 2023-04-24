@@ -3,19 +3,9 @@ import re
 import argparse
 from Bio import SeqIO
 
-if __name__ == "__main__":
-    
-    parser = argparse.ArgumentParser(description="Takes a FASTA file and generates de Bruijn kmers")
-    parser.add_argument("--input_fasta", action="store", required=True,
-                                        help="Filename of .fasta input")
-    parser.add_argument("--kmer_size", action="store", type=int, required=True,
-                                        help="Size of kmer edges") 
-    inputs = parser.parse_args()
-    kmer_file = edgelist(inputs.input_fasta, inputs.kmer_size)
-
 # in a de Bruijn graph, edges=kmers and nodes=(k-1)mers
 # specify FASTA file, desired kmer and number of proteins
-def edgelist(input_fasta,kmer_size):
+def edgelist(input_fasta, kmer_size):
     
     # define new file name, create empty list(s) and data frame(s)
     writefile = input_fasta.replace(".fasta",'')
@@ -43,4 +33,18 @@ def edgelist(input_fasta,kmer_size):
                 if len(n1) and len(n2) == kmer_size - 1:
                     f.write("%s,%s,%s\n"%(n1,n2,ProteinID))
                     print("{} edge #{} = {}-{}".format(ProteinID,i,n1,n2))
-        
+
+def main():
+
+    kmer_file = edgelist(args.input_fasta, args.kmer_size)
+
+
+if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser(description="Takes a FASTA file and generates de Bruijn kmers")
+    parser.add_argument("--input_fasta", action="store", required=True,
+                                        help="Filename of .fasta input")
+    parser.add_argument("--kmer_size", action="store", type=int, required=True,
+                                        help="Size of kmer edges") 
+    args = parser.parse_args()
+    main()
