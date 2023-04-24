@@ -4,18 +4,6 @@ import argparse
 from Bio import SeqIO
 from itertools import groupby
 
-
-if __name__ == "__main__":
-    
-    parser = argparse.ArgumentParser(description="Collapses an annotated deBruijn kmer file into uniques while aggregating IDs")
-    parser.add_argument("--input_file", action="store", required=True,
-                                        help="Filename for kmer edge list (.csv)")
-    parser.add_argument("--sep", action="store", required=False, default=',',
-                                        help="Column separator for input file, default=,")
-    
-    inputs = parser.parse_args()
-    unique_kmer_file = unique(inputs.input_file)
-
 # generate unique edge list with aggregate protein IDs
 def unique(input_file):
     
@@ -45,3 +33,18 @@ def unique(input_file):
     uniques_df.to_csv("{}_unique.csv".format(output_file),index=False)
         
     #print(uniques_df)
+
+def main():
+
+    unique_kmer_file = unique(inputs.input_file)
+
+if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser(description="Collapses an annotated deBruijn kmer file into uniques while aggregating IDs")
+    parser.add_argument("--input_file", action="store", required=True,
+                                        help="Filename for kmer edge list (.csv)")
+    parser.add_argument("--sep", action="store", required=False, default=',',
+                                        help="Column separator for input file, default=,")
+    
+    inputs = parser.parse_args()
+    main()
