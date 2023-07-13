@@ -3,7 +3,7 @@ import pandas as pd
 import argparse
 import re
 import numpy as np
-np.random.seed(13)
+np.random.seed(666)
 
 """ recursive function for growing kmer sequence in N-terminal direction """
 def grow_seq_n(seed_kmer, input_df, nterm_kmers=None, length=None, cons_seq_n=None):
@@ -76,7 +76,7 @@ def grow_seq_c(seed_kmer, input_df, cterm_kmers=None, length=None):
         cterm_kmers.append(seed_kmer)
 
         poss_paths_cterm = input_df[input_df['Node1'] == seed_kmer]
-        ##print("possible future directions =",poss_paths_cterm)
+        #print("possible future directions =",poss_paths_cterm)
 
         # find edge with highest counts
         most_common_kmer_c = poss_paths_cterm['ProteinCount'] == poss_paths_cterm['ProteinCount'].max()
@@ -119,6 +119,8 @@ def main():
     # read in file
     dBg_unique = inputs.input_file
     input_df = pd.read_csv(dBg_unique)
+    cols=['Node1','Node2','ProteinCount']
+    input_df.columns = cols
 
     # find the most common edge for starting seeds
     most_common_edge = input_df['ProteinCount'] == input_df['ProteinCount'].max()
@@ -132,9 +134,9 @@ def main():
 
     # grow sequence recursively
     nterm_seq = grow_seq_n(seed_kmer_1, input_df)
-    #print("nterm seq = {}\nlength = {}".format(nterm_seq,len(nterm_seq)))
+    print("nterm seq = {}\nlength = {}".format(nterm_seq,len(nterm_seq)))
     cterm_seq = grow_seq_c(seed_kmer_2, input_df)
-    #print("cterm seq = {}\nlength = {}".format(cterm_seq,len(cterm_seq)))
+    print("cterm seq = {}\nlength = {}".format(cterm_seq,len(cterm_seq)))
 
     consensus_seq = nterm_seq+cterm_seq
     #print("\nthe consensus sequence (length {} aa) is: \n{}".\
@@ -153,6 +155,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculates a consensus sequence for a deBruijn kmer file with unique kmers")
     parser.add_argument("--input_file", action="store", required=True,
                                         help="Filename for unique kmer edge list (.csv)")
+    parser.add_argument("--num_seqs", action="store", required=False,
+                                        help="Number of consensus sequences to generate.")
     inputs = parser.parse_args()
     main()
     

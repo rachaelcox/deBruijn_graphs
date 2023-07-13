@@ -1,24 +1,25 @@
 import csv
 import re
 import argparse
+import pickle
 from Bio import SeqIO
 
 # in a de Bruijn graph, edges=kmers and nodes=(k-1)mers
 # specify FASTA file, desired kmer and number of proteins
-def edgelist(input_fasta, kmer_size):
+def edgelist(input_fasta, kmer_size, outfile, pickle_result):
     
     # define new file name, create empty list(s) and data frame(s)
-    writefile = input_fasta.replace(".fasta",'')
-    nodes = []
+    if not outfile:
+        base = input_fasta.replace(".fasta",'')
+        outfile = "{}_dBg_{}mers.csv".format(writefile,kmer_size)
     
     # extract lists of nodes and edges from FASTA file, then write edge list to csv
-    with open("{}_dBg_{}mers.csv".format(writefile,kmer_size),"w") as f:
+    with open(outfile, "w") as f:
         
         f.write("%s,%s,%s\n"%("Node1","Node2","ProteinID"))
         for record in SeqIO.parse(open(input_fasta,"r"), "fasta"):
             
             seq_str = record.seq
-
             pattern = r'(tr|sp)\|(.*)\|\S*'
             match = re.search(pattern, str(record.id))
             if match:
@@ -32,11 +33,17 @@ def edgelist(input_fasta, kmer_size):
                 
                 if len(n1) and len(n2) == kmer_size - 1:
                     f.write("%s,%s,%s\n"%(n1,n2,ProteinID))
-                    print("{} edge #{} = {}-{}".format(ProteinID,i,n1,n2))
+                    #print("{} edge #{} = {}-{}".format(ProteinID,i,n1,n2))
+    
+    if pickle_result:
+        pkl_out = outfile.replace(".csv", ".pkl")
+        with open(outfile, 'r') as f:
+            reader = csv.reader(f)
+            pickle.dump(list(reader), open(pkl_out, 'wb'))
 
 def main():
 
-    kmer_file = edgelist(args.input_fasta, args.kmer_size)
+    kmer_file = edgelist(args.input_fasta, args.kmer_size, args.outfile, args.pickle)
 
 
 if __name__ == "__main__":
@@ -46,5 +53,8 @@ if __name__ == "__main__":
                                         help="Filename of .fasta input")
     parser.add_argument("--kmer_size", action="store", type=int, required=True,
                                         help="Size of kmer edges") 
+    parser.add_argument("--outfile", action="store", type=str, required=False,
+                                        help="(Optional) Name for output file")
+    parser.add_argument("--pickle", action="store_true", default=None, help="(Optional) Serialize results in a pickle file.")
     args = parser.parse_args()
     main()
