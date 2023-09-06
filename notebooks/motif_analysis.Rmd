@@ -18,7 +18,7 @@ library(skimr) # skim() function
 library(colorspace) # swatchplot() function
 `%!in%` = Negate(`%in%`)
 
-setwd('/project/rmcox/deBruijn_graphs/')
+setwd('/stor/work/Marcotte/project/rmcox/deBruijn_graphs/petase/')
 
 palette_pretty <- c("#0072B2","#E69F00","#009E24","#FF0000", "#979797","#5530AA")
 swatchplot(palette_pretty)
@@ -77,14 +77,30 @@ nr_blast %>%
 
 ```{r }
 
-p <- nr_blast %>%
+nr_blast_fmt <- nr_blast %>%
+  mutate(label = case_when(experiment == 'DBG_7mer_Consensus' ~ 'deBruijn graph derived\nconsensus sequence',
+                           experiment == 'MEME_Suite_Motif' ~ 'MEME Suite derived\nconsensus sequence',
+                           experiment == 'Reference_FASTA' ~ 'Reference sequence\nFASTA (n=22)',
+                           TRUE ~ experiment))
+
+num_hits <- nr_blast_fmt %>%
   filter(experiment != "Raghav") %>%
-  ggplot(aes(x = bit_score, fill = experiment)) +
+  group_by(label) %>%
+  tally()
+
+p <- nr_blast_fmt %>%
+  filter(experiment != "Raghav") %>%
+  ggplot(aes(x = bit_score, fill = label)) +
     geom_density(alpha = 0.5) +
     scale_x_log10() +
+    labs(x = "Bit score distribution for top 100 BLAST hits",
+         y = "Kernel density estimate", fill = "") +
+    theme(legend.position = "top") +
     scale_fill_manual(values = palette_pretty)
 p
-p %>% ggsave("figures/dbg_comp_bitscores.tiff", ., device = "tiff", 
+p %>% ggsave("figures/dbg_top100-BLAST_bitscores.png", ., device = "png", 
+         width = 8, height = 6, units = "in")
+p %>% ggsave("figures/dbg_top100-BLAST_bitscores.pdf", ., device = "pdf", 
          width = 8, height = 6, units = "in")
 
 ```
@@ -111,9 +127,11 @@ ragh_hits <- nr_blast %>%
 
 ```{r }
 
-overlap <- calculate.overlap(x = list("DBG_7mer_Consensus" = dbg_hits$accession,
-                                  "Reference_FASTA" = ref_hits$accession,
-                                  "MEME_Suite_Motif" = meme_hits$accession))
+grps = c("deBruijn graph derived\nconsensus sequence", "MEME Suite derived\nconsensus sequence", "Reference sequence\nFASTA (n=22)")
+
+overlap <- calculate.overlap(x = list("deBruijn graph derived\nconsensus sequence" = dbg_hits$accession,
+                                  "Reference sequence\nFASTA (n=22)" = ref_hits$accession,
+                                  "MEME Suite derived\nconsensus sequence" = meme_hits$accession))
 overlap
 
 grid.newpage()
@@ -124,9 +142,9 @@ venn.plot <- draw.triple.venn(area1 = length(dbg_hits$accession),
                               n23 = length(overlap$a6) + length(overlap$a5),
                               n13 = length(overlap$a4) + length(overlap$a5), 
                               n123 = length(overlap$a5), 
-                              category = c("DBG_Consensus",
-                                           "Reference_FASTA",
-                                           "MEME_Suite"),
+                              category = c(grps[1],
+                                           grps[3],
+                                           grps[2]),
                  lty = "blank", lwd = 2, cex = 1.5,
                  euler.d = TRUE, scaled = TRUE, cat.prompts = TRUE,
                  fill = c("#0072B2", "#009E24", "#E69F00"), alpha = 0.3,
@@ -134,9 +152,10 @@ venn.plot <- draw.triple.venn(area1 = length(dbg_hits$accession),
                  cat.fontfamily = "sans", cat.cex = 1,
                  cat.default.pos = 'outer')
 grid.draw(venn.plot)
-venn.plot %>% ggsave("figures/dbg_comp_venn.tiff", ., device = "tiff", 
-         width = 8.25, height = 6, units = "in")
-
+venn.plot %>% ggsave("figures/dbg_top100-blast_overlap.png", ., device = "png", 
+         width = 12, height = 11, units = "in")
+venn.plot %>% ggsave("figures/dbg_top100-blast_overlap.pdf", ., device = "pdf", 
+         width = 12, height = 11, units = "in")
 ```
 
 ```{r }
@@ -173,53 +192,85 @@ test <- read_csv("motif_analysis/test.csv") %>%
   unique() %>%
   mutate(seq_length = str_length(sequence))
 
-prot_counts <- nr_blast %>% 
+prot_counts <- nr_blast_fmt %>% 
   left_join(test) %>%
-  mutate_if(is.character, str_to_lower) %>%
+  mutate(protein = str_to_lower(protein)) %>%
   mutate(protein = str_remove(protein, ' \\d')) %>% 
   mutate(protein = str_remove(protein, ' family protein')) %>%
-  group_by(experiment, protein) %>%
+  mutate(protein = case_when(protein == 'putative dienelactone hydrolase' ~ 'dienelactone hydrolase', TRUE ~ protein)) %>% 
+  group_by(label, protein) %>%
   tally()
 
 p <- prot_counts %>%
-  filter(experiment != "raghav") %>% 
-    ggplot(aes(x = protein, y = n, fill = experiment)) +
-      geom_col(position = "dodge") +
-      geom_text(aes(label = n), hjust = 1, color = "white", size = 3) +
-      facet_wrap(~experiment, nrow = 1) +
+  filter(label != "Raghav") %>% 
+    ggplot(aes(x = protein, y = n, fill = label)) +
+      geom_col(position = position_dodge2(width = 0.9, preserve = "single")) +
+      #geom_text(aes(label = n), hjust = 1, color = "white", size = 3) +
+      #facet_wrap(~experiment, nrow = 1) +
       scale_fill_manual(values = palette_pretty) +
-      ylab("count") +
-      xlab("protein family") +
-      ggtitle("top 100 proteins, family distribution") +
-      coord_flip()
+      theme(axis.text.x = element_text(angle = 50, vjust = 1, hjust = 1, 
+                                       size = 10),
+            legend.position = "top") +
+      labs(x = "", y = "count", fill = "")
 p
-p %>% ggsave("figures/dbg_comp_prots.tiff", ., device = "tiff", 
-         width = 8, height = 4, units = "in")
+p %>% ggsave("figures/dbg_top100-blast_prot-categories.png", ., device = "png", 
+         width = 9, height = 4.5, units = "in")
+p %>% ggsave("figures/dbg_top100-blast_prot-categories.pdf", ., device = "pdf", 
+         width = 9, height = 4.5, units = "in")
 
-org_counts <- nr_blast %>% 
+org_phyla <- read_csv("bacteria_genus_phyla.csv") %>%
+  clean_names()
+
+org_df <- nr_blast_fmt %>% 
   left_join(test) %>%
-  mutate_if(is.character, str_to_lower) %>%
+  mutate(protein =  str_to_lower(protein)) %>%
   mutate(protein = str_remove(protein, ' \\d')) %>% 
   mutate(protein = str_remove(protein, ' family protein')) %>%
-  mutate(organism = str_remove(organism, ' .*')) %>% 
-  group_by(experiment, organism) %>%
+  mutate(organism = str_remove(organism, ' .*')) %>%
+  mutate(organism = ifelse(organism == "[Polyangium]", "Polyangium", organism)) %>%
+  mutate(organism = str_to_title(organism)) %>% 
+  left_join(org_phyla, by = c("organism" = "genus")) %>%
+  mutate(phyla = coalesce(phyla, organism))
+
+org_counts <- org_df %>% 
+  group_by(label, phyla) %>%
   tally()
 
 p <- org_counts %>% 
-  filter(experiment != "raghav") %>%
-    ggplot(aes(x = organism, y = n, fill = experiment)) +
+  filter(label != "Raghav") %>%
+    ggplot(aes(x = phyla, y = n, fill = label)) +
       geom_col(position = position_dodge2(width = 0.9, preserve = "single")) +
-      geom_text(aes(label = n), hjust = 1, color = "white", size = 3) +
-      theme(axis.title.y = element_blank()) +
-      facet_wrap(~experiment, nrow = 1) +
+      #geom_text(aes(label = n), hjust = 1, color = "white", size = 3) +
+      theme(legend.position = "top",
+            axis.text.x = element_text(angle = 45, vjust = 1,
+                                       hjust = 1, size = 12)) +
+      #facet_wrap(~label, nrow = 1) +
       scale_fill_manual(values = palette_pretty) +
-      ylab("count") +
-      xlab("species genera") +
-      ggtitle("top 100 proteins, species distribution") +
-      coord_flip()
+      labs(x = "", y = "# species", fill = "")
 p
-p %>% ggsave("figures/dbg_comp_orgs.tiff", ., device = "tiff", 
-         width = 8, height = 4, units = "in")
+
+p %>% ggsave("figures/dbg_top100-blast_phylum-categories.png", ., device = "png", 
+         width = 9, height = 4.5, units = "in")
+p %>% ggsave("figures/dbg_top100-blast_phylum-categories.pdf", ., device = "pdf", 
+         width = 9, height = 4.5, units = "in")
+
+p <- org_df %>% 
+  filter(label != "Raghav", phyla == "Actinomycetes") %>%
+    ggplot(aes(x = organism, fill = label)) +
+      geom_bar(position = position_dodge2(width = 0.9, preserve = "single")) +
+      #geom_text(aes(label = n), hjust = 1, color = "white", size = 3) +
+      theme(legend.position = "top",
+            axis.text.x = element_text(angle = 45, vjust = 1,
+                                       hjust = 1, size = 9)) +
+      #facet_wrap(~label, nrow = 1) +
+      scale_fill_manual(values = palette_pretty) +
+      labs(x = "", y = "# species", fill = "")
+p
+
+p %>% ggsave("figures/dbg_top100-blast_phylum-categories_actino_zoom.png", ., device = "png", 
+         width = 9, height = 4.5, units = "in")
+p %>% ggsave("figures/dbg_top100-blast_phylum-categories_actino_zoom.pdf", ., device = "pdf", 
+         width = 9, height = 4.5, units = "in")
   
 ```
 
