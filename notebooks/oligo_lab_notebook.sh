@@ -27,12 +27,13 @@ AGAACTTACATCAACTAAACAACAAATGAACAAAAAAAAAA
 /stor/work/Ellington/scratch/Zac/PLA/data/new_data/*Lib12*
 /stor/work/Ellington/scratch/Zac/PLA/data/new_data/*Probe12* # same as Lib12?
 /stor/work/Ellington/scratch/Zac/PLA/data/new_data/*Probe34* # what are these?
-/stor/work/Ellington/scratch/Zac/PLA/data/new_data/*Oligo3-Undetermined* # what is this?w
+/stor/work/Ellington/scratch/Zac/PLA/data/new_data/*Oligo3-Undetermined* # what is this?
 
 # organization
 mkdir -p data/raw/{oligo_1,oligo_2,oligo_3,oligo_b,streptavidin}
 mkdir -p data/qc/{oligo_1,oligo_2,oligo_3,oligo_b,streptavidin}
 mkdir -p data/processed/{oligo_1,oligo_2,oligo_3,oligo_b,streptavidin}
+
 
 ln -s /stor/work/Ellington/scratch/Zac/PLA/data/new_data/*Oligo1* /stor/work/Marcotte/project/rmcox/deBruijn_graphs/oligo/data/raw/oligo_1
 ln -s /stor/work/Ellington/scratch/Zac/PLA/data/new_data/*Oligo2* /stor/work/Marcotte/project/rmcox/deBruijn_graphs/oligo/data/raw/oligo_2
@@ -50,13 +51,8 @@ ln -s /stor/work/Ellington/scratch/Zac/PLA/data/new_data/*Probe12-SA* /stor/work
 # data QC
 # =======================================
 
-fastqc --noextract --nogroup -o ../qc/ */* 
-
-for x in 1 2 3 b; do echo "multiqc data/qc/oligo_${x}/ --filename data/qc/multiqc/oligo_${x} --interactive"; done > cmds/multiqc.cmds
-cat cmds/multiqc.cmds | parallel -j4
-
-# oo i'm going to try fastp, seems like a good all in 1 tool
-# template command
+# i'm going to try fastp, seems like a good all in 1 tool
+# template command for fastp
 fastp -i R1.fastq.qz -I R2.fastq.gz -o R1.trimmed.fastq.gz -o R2.trimmed.fastq.gz -p --failed_out data/qc/fastp_failed/
 
 # oligo data
@@ -247,7 +243,20 @@ touch cmds/generate_5to15mer_weights_hfog2.sh
 for k in {5..15}; do
 	cat cmds/generate_${k}mer_weights_hfog2.sh >> cmds/generate_5to15mer_weights_hfog2.sh
 done
-cat cmds/generate_5to15mer_weights_hfog2.sh | parallel -j10
+cat cmds/generate_5to15mer_weights_hfog2.sh | parallel -j12
+
+# wtffff the script is terminating without an error
+# (╯°□°)╯︵ ┻━┻
+head -1000 results/5mer/oligo_1_0w_5mers.csv > debug/collapse_debug.csv
+python3 ../scripts/collapse_kmer_uniques.py --input_file debug/collapse_debug.csv --outfile debug/collapse_debug_unique.csv
+
+# ok I fixed it
+# 5 to 9mers on hfog1, going to start at the 10mers on hfog2
+cat cmds/generate_5to15mer_weights.sh | grep -n '10mer' # starts at line 81
+head -80 cmds/generate_5to15mer_weights.sh > cmds/generate_5to9mer_weights.sh
+cat cmds/generate_5to9mer_weights.sh | parallel -j2
+tail -n +81 cmds/generate_5to15mer_weights_hfog2.sh > cmds/generate_10to15mer_weights_hfog2.sh
+cat cmds/generate_10to15mer_weights_hfog2.sh | parallel -j8
 
 # old notes from first pass:
 python3 ../scripts/collapse_kmer_uniques.py --input_file results/10mer/oligo_1_0w_10mers.csv --outfile results/10mer/oligo_1_0w_10mers_unique.csv
@@ -351,16 +360,16 @@ cat cmds/generate_5to15mer_weights_strep.sh | parallel -j24
 # starting a parallel run on hfog1
 for k in {5..15}; do
 	for exp in bg 0w 3w 7w; do
-	echo "python3 ../scripts/collapse_kmer_uniques.py --input_file results/${k}mer/streptavidin_${exp}_${k}mers.csv --outfile results/hfog1/streptavidin_${exp}_${k}mers_unique.csv | tee -a logs/streptavidin_${exp}_${k}mers_collapse_unique_hfog1.log"
-done > cmds/generate_${k}mer_weights_strep_hfog1.sh
+	echo "python3 ../scripts/collapse_kmer_uniques.py --input_file results/${k}mer/streptavidin_${exp}_${k}mers.csv --outfile results/kmer_counts_all/streptavidin_${exp}_${k}mers_unique.csv | tee -a logs/streptavidin_${exp}_${k}mers_collapse_unique.log"
+done > cmds/generate_${k}mer_weights_strep.sh
 done 
 
-rm cmds/generate_5to15mer_weights_strep_hfog1.sh
-touch cmds/generate_5to15mer_weights_strep_hfog1.sh
+rm cmds/generate_5to15mer_weights_strep.sh
+touch cmds/generate_5to15mer_weights_strep.sh
 for k in {5..15}; do
-	cat cmds/generate_${k}mer_weights_strep_hfog1.sh >> cmds/generate_5to15mer_weights_strep_hfog1.sh
+	cat cmds/generate_${k}mer_weights_strep.sh >> cmds/generate_5to15mer_weights_strep.sh
 done
-cat cmds/generate_5to15mer_weights_strep_hfog1.sh | parallel -j6
+cat cmds/generate_5to15mer_weights_strep.sh | parallel -j4
 
 # make "all" oligo bait kmer files (each oligo concatenated) for enrichment script
 for k in {5..15}; do
@@ -448,62 +457,109 @@ bash cmds/threshold_kmers_q05.cmds
 # organize enrichment files
 for k in {5..15}; do
 	mkdir oligo/results/${k}mer/enrichment_all/
-	mv oligo/results/${k}mer/*${k}mer_enrichment.csv oligo/results/${k}mer/enrichment_all/
+	
 	mkdir oligo/results/${k}mer/enrichment_q03cut/
 	mkdir oligo/results/${k}mer/enrichment_q04cut/
 	mkdir oligo/results/${k}mer/enrichment_q05cut/
 done
 
-# [01/2024] rewrite to CLI:
+for k in {5..15}; do
+	mv results/${k}mer/enrichment_all/*${k}mer_enrichment.csv archive/
+done
 
+# [01/2024] rewrite to CLI
 
+# template command
+python3 ../scripts/calc_kmer_enrichment.py \
+--exp_file results/10mer/kmer_counts_all/oligo_3_3w_10mers_unique.csv \
+--bg_file results/10mer/kmer_counts_all/oligo_3_bg_10mers_unique.csv \
+--lib_file data/bait_kmers/library_10mers.csv \
+--oligo_file data/bait_kmers/oligo_3_comp_10mers.csv \
+--outfile results/10mer/enrichment_all/oligo_3_3w_enrich.csv
+
+# generate cmds in loop for oligos
+for k in {5..15}; do
+	for x in 1 2 3; do
+	echo "python3 ../scripts/calc_kmer_enrichment.py \
+--exp_file results/${k}mer/kmer_counts_all/oligo_${x}_0w_${k}mers_unique.csv \
+--bg_file results/${k}mer/kmer_counts_all/oligo_${x}_bg_${k}mers_unique.csv \
+--lib_file data/bait_kmers/library_${k}mers.csv \
+--oligo_file data/bait_kmers/oligo_${x}_comp_${k}mers.csv \
+--outfile results/${k}mer/enrichment_all/oligo_${x}_0w_enrich.csv"
+	echo "python3 ../scripts/calc_kmer_enrichment.py \
+--exp_file results/${k}mer/kmer_counts_all/oligo_${x}_1w_${k}mers_unique.csv \
+--bg_file results/${k}mer/kmer_counts_all/oligo_${x}_bg_${k}mers_unique.csv \
+--lib_file data/bait_kmers/library_${k}mers.csv \
+--oligo_file data/bait_kmers/oligo_${x}_comp_${k}mers.csv \
+--outfile results/${k}mer/enrichment_all/oligo_${x}_1w_enrich.csv"
+	echo "python3 ../scripts/calc_kmer_enrichment.py \
+--exp_file results/${k}mer/kmer_counts_all/oligo_${x}_3w_${k}mers_unique.csv \
+--bg_file results/${k}mer/kmer_counts_all/oligo_${x}_bg_${k}mers_unique.csv \
+--lib_file data/bait_kmers/library_${k}mers.csv \
+--oligo_file data/bait_kmers/oligo_${x}_comp_${k}mers.csv \
+--outfile results/${k}mer/enrichment_all/oligo_${x}_3w_enrich.csv"
+done
+done > cmds/calc_kmer_enrichment_oligos.sh
+cat cmds/calc_kmer_enrichment_oligos.sh | parallel -j12
+
+# generate cmds in loop for streptavidin
+for k in {5..15}; do
+	for w in 0w 3w 7w; do
+	echo "python3 ../scripts/calc_kmer_enrichment.py \
+--exp_file results/${k}mer/kmer_counts_all/streptavidin_${w}_${k}mers_unique.csv \
+--bg_file results/${k}mer/kmer_counts_all/streptavidin_bg_${k}mers_unique.csv \
+--lib_file data/bait_kmers/library_${k}mers.csv \
+--oligo_file data/bait_kmers/oligo_all_comp_${k}mers.csv \
+--outfile results/${k}mer/enrichment_all/streptavidin_${w}_enrich.csv"
+done
+done > cmds/calc_kmer_enrichment_strep.sh
+cat cmds/calc_kmer_enrichment_strep.sh | parallel -j8
+
+# plot results
+# template command
+Rscript ../scripts/plot_kmer_enrichment.R --kmer_size 6
+for k in {5..15}; do
+	echo "Rscript ../scripts/plot_kmer_enrichment.R --kmer_size ${k}"
+done > cmds/plot_kmer_enr.sh
+cat cmds/plot_kmer_enr.sh | parallel -j6
+
+# filter kmers based on apex z-score
+# (look in jupyter)
+
+# generate PCA plots
+# template command
+Rscript ../scripts/plot_pca.R --kmer_size 6 --top_n 100
+for k in {5..15}; do
+	echo "Rscript ../scripts/plot_pca.R --kmer_size ${k} --top_n 100"
+done > cmds/plot_kmer_pca.sh
+cat cmds/plot_kmer_pca.sh | parallel -j3
 
 # ---------------------------------------
 # generate consensus sequences from filtered kmers
 # ---------------------------------------
 
-for i in 1 2 3; do
-	python3 ../scripts/calc_consensus_seq.py --input_file results/thresholded/oligo_${i}_10mer_graph_fdr1e-10.csv --seed_diversity
+for k in {5..15}; do
+	mkdir results/${k}mer/consensus_seqs/
 done
 
-for i in 1 2 3; do
-	python3 ../scripts/calc_consensus_seq.py --input_file results/thresholded/oligo_${i}_10mer_graph_fdr1e-10_3log2fc.csv --seed_diversity
+for k in {5..15}; do
+	python3 ../scripts/calc_consensus_seq.py --input_file results/${k}mer/enrichment_all/streptavidin_3w_enrich_fdr_filter.csv --seed_diversity
+	python3 ../scripts/calc_consensus_seq.py --input_file results/${k}mer/enrichment_all/streptavidin_3w_enrich_z_filter.csv --seed_diversity
+	python3 ../scripts/calc_consensus_seq.py --input_file results/${k}mer/enrichment_all/streptavidin_7w_enrich_fdr_filter.csv --seed_diversity
+	python3 ../scripts/calc_consensus_seq.py --input_file results/${k}mer/enrichment_all/streptavidin_7w_enrich_z_filter.csv --seed_diversity
+	for i in 1 2 3; do
+	python3 ../scripts/calc_consensus_seq.py --input_file results/${k}mer/enrichment_all/oligo_${i}_3w_enrich_fdr_filter.csv --seed_diversity
+	python3 ../scripts/calc_consensus_seq.py --input_file results/${k}mer/enrichment_all/oligo_${i}_3w_enrich_z_filter.csv --seed_diversity
+done
 done
 
-for i in 1 2 3; do
-	python3 ../scripts/calc_consensus_seq.py --input_file results/thresholded/oligo_${i}_10mer_graph_fdr1e-10_3w.csv
+for x in 1 2 3; do
+	rm results/oligo_${x}_cons_seqs.fasta
 done
-
-for i in 1 2 3; do
-	cat results/thresholded/oligo_${i}_10mer_graph_fdr1e-10.consensus.fasta results/thresholded/oligo_${i}_10mer_graph_fdr1e-10_3log2fc.consensus.fasta data/fastas/oligo_${i}_comp.fasta data/fastas/prey.fasta > results/alignment_fastas/oligo_${i}_cons_bait.fasta
-done
-
-# ---------------------------------------
-# generate consensus sequences from filtered kmers (pruned)
-# ---------------------------------------
-
-# fdr only
-for i in 1 2 3; do
-	python3 ../scripts/calc_consensus_seq.py --input_file results_pruned/thresholded/oligo_${i}_10mer_graph_fdr1e-10.csv --seed_diversity
-done
-
-# log2fc = 3
-for i in 1 2 3; do
-	python3 ../scripts/calc_consensus_seq.py --input_file results_pruned/thresholded/oligo_${i}_10mer_graph_fdr1e-10_3log2fc.csv --seed_diversity
-done
-
-# log2fc = 4
-for i in 1 2 3; do
-	python3 ../scripts/calc_consensus_seq.py --input_file results_pruned/thresholded/oligo_${i}_10mer_graph_fdr1e-10_4log2fc.csv --seed_diversity
-done
-
-
-for i in 1 2 3; do
-	python3 ../scripts/calc_consensus_seq.py --input_file results/thresholded/oligo_${i}_10mer_graph_fdr1e-10_3w.csv
-done
-
-for i in 1 2 3; do
-	cat results/thresholded/oligo_${i}_10mer_graph_fdr1e-10.consensus.fasta results/thresholded/oligo_${i}_10mer_graph_fdr1e-10_3log2fc.consensus.fasta data/fastas/oligo_${i}_comp.fasta data/fastas/prey.fasta > results/alignment_fastas/oligo_${i}_cons_bait.fasta
+for k in 5 8 10; do
+	cat results/${k}mer/enrichment_all/oligo_1*z_filter*fasta >> results/oligo_1_cons_seqs.fasta
+	cat results/${k}mer/enrichment_all/oligo_2*z_filter*fasta >> results/oligo_2_cons_seqs.fasta
+	cat results/${k}mer/enrichment_all/oligo_3*z_filter*fasta >> results/oligo_3_cons_seqs.fasta
 done
 
 # ---------------------------------------
@@ -550,6 +606,42 @@ python3 scripts/generate_deBruijn_kmers.py --input_fasta guaymas/data/PETHits_Gu
 python3 scripts/collapse_kmer_uniques.py --input_file guaymas/results/PETHits_7mers.csv --outfile guaymas/results/PETHits_7mers_unique_ids.csv --return_ids
 python3 scripts/calc_consensus_seq.py --input_file guaymas/results/PETHits_7mers_unique.csv --outfile_prefix guaymas/results/PETHits_consensus
 python3 scripts/generate_deBruijn_kmers.py --input_fasta guaymas/results/PETHits_consensus.fasta --kmer_size 8 --outfile guaymas/results/PETHits_consensus_7mers.csv
+
+# phylo-stratified nylonase set
+for i in 0 1 2 3 4; do
+	python3 scripts/generate_deBruijn_kmers.py --input_fasta /stor/work/Marcotte/project/drbarth/plastics/data/raw/deBruijn_g${i}.fasta --kmer_size 7 --outfile /stor/work/Marcotte/project/rmcox/deBruijn_graphs/guaymas/results/phylo_stratified/nylonase_g${i}_7mers.csv
+done
+
+for i in 0 1 2 3 4; do
+	python3 scripts/collapse_kmer_uniques.py --input_file guaymas/results/phylo_stratified/nylonase_g${i}_7mers.csv --outfile guaymas/results/phylo_stratified/nylonase_g${i}_7mers_unique.csv
+done
+
+# number of sequences per clade:
+for i in 0 1 2 3 4; do
+	grep -c '^>' /stor/work/Marcotte/project/drbarth/plastics/data/raw/deBruijn_g${i}.fasta
+done
+
+# 0: 31
+# 1: 62
+# 2: 26
+# 3: 181
+# 4: 206
+
+# top shared per clade:
+for i in 0 1 2 3 4; do
+	head guaymas/results/phylo_stratified/nylonase_g${i}_7mers_unique.csv
+done
+
+# 0: EQGTSF,QGTSFD  8/31 (25.8%)
+# 1: ALIGIA,LIGIAI  13/62 (21.0%)
+# 2: PLGMTD,LGMTDT  8/26 (30.8%)
+# 3: NALVGI,ALVGIL  58/181 (32.0%)
+# 4: ILTRRS,LTRRSG  34/206 (16.5%)
+
+# number edges per weighted clade graph
+for i in 0 1 2 3 4; do
+	wc -l guaymas/results/phylo_stratified/nylonase_g${i}_7mers_unique.csv
+done
 
 # --------------------------------------------------
 # TO DO
