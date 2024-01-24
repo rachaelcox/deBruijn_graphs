@@ -1,22 +1,24 @@
 library(tidyverse)
 
-g_df <- read_csv('deBruijn_graphs/keto/results/g_7mers_uniq.csv') %>%
-  mutate(family = 'G')
-p_df <- read_csv('deBruijn_graphs/keto/results/p_7mers_uniq.csv') %>%
-  mutate(family = 'P')
+df1 <- read_csv('deBruijn_graphs/keto/results/f_7mers_uniq.csv') %>%
+  mutate(family = 'F')
+df2 <- read_csv('deBruijn_graphs/keto/results/k_7mers_uniq.csv') %>%
+  mutate(family = 'K')
 
 
-foldchange <- bind_rows(g_df, p_df) %>%
+foldchange <- bind_rows(df1, df2) %>%
   pivot_wider(names_from='family', values_from = 'count') %>%
   replace(is.na(.), as.numeric("0")) %>%
-  mutate(G_impute = G+1, P_impute = P+1) %>%
-  mutate(G_prop = (G/42)*100, P_prop = (P/40)*100) %>% 
-  mutate(fc = G_impute/P_impute,
+  mutate(F_impute = F+1, K_impute = K+1) %>%
+  mutate(F_prop = (F/67)*100, K_prop = (K/167)*100) %>% 
+  mutate(fc = F_impute/K_impute,
          log2fc = log2(fc)) %>%
   mutate_if(is.numeric, function(x) ifelse(is.infinite(x), 0, x)) %>% 
-  arrange(desc(log2fc))
+  arrange(desc(log2fc)) %>%
+  mutate(motif = paste0(node1, substr(node2, nchar(node2), nchar(node2)))) %>%
+  select(node1, node2, motif, everything(), -ids)
 
-write_csv(foldchange, 'deBruijn_graphs/keto/results/p-vs-g_motif_enrichment_060223.csv')
+write_csv(foldchange, 'deBruijn_graphs/keto/results/k-vs-f_motif_enrichment_060623.csv')
 
 gp_df <- bind_rows(f_df, k_df) %>%
   group_by(node1, node2) %>%
