@@ -200,8 +200,10 @@ def main():
     # read in and format data
     dBg_unique = args.input_file
     input_df = pd.read_csv(dBg_unique)
-    cols=['Node1','Node2','Weight']
-    input_df.columns = cols
+    cols=['node1','node2','apex_zscore']
+    input_df = input_df[cols]
+    new_col_names = ['Node1','Node2','Weight']
+    input_df.columns = new_col_names
     input_df.sort_values('Weight', ascending=False, inplace=True)
 
     # format outfile name

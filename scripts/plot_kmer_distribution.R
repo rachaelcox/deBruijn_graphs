@@ -48,9 +48,9 @@ plot_counts <- function(df, k){
   
   out_prefix = paste0("deBruijn_graphs/oligo/figures/", kmer, "_counts")
   h = 6.5; w = 7.5
-  p1 %>% ggsave(paste0(out_prefix, "_full.png"), ., device = "png",
+  p1 %>% ggsave(paste0(out_prefix, ".png"), ., device = "png",
                 width = w, height = h, units = "in")
-  p1 %>% ggsave(paste0(out_prefix, "_full.pdf"), ., device = "pdf",
+  p1 %>% ggsave(paste0(out_prefix, ".pdf"), ., device = "pdf",
                 width = w, height = h, units = "in")
   
 }
@@ -60,21 +60,21 @@ plot_counts <- function(df, k){
 # main
 # -----------------------------------
 
-# for (k in 5:15){
-#   
-#   kmer = paste0(k, "mer")
-#   kmer_dir = paste0("deBruijn_graphs/oligo/results/", kmer, "/")
-#   kmer_pattern = paste0(kmer, "s_unique.csv")
-#   df <- combine_data(data_dir = kmer_dir,
-#                      data_pattern = kmer_pattern)
-#   plot_counts(df, k=k)
-# 
-# }
+for (k in 5:15){
 
-k=15
-kmer = paste0(k, "mer")
-kmer_dir = paste0("deBruijn_graphs/oligo/results/", kmer, "/")
-kmer_pattern = paste0(kmer, "s_unique.csv")
-df <- combine_data(data_dir = kmer_dir,
-                   data_pattern = kmer_pattern)
-plot_counts(df, k=k)
+  kmer = paste0(k, "mer")
+  kmer_dir = paste0("deBruijn_graphs/oligo/results/", kmer, "/kmer_counts_all/")
+  kmer_pattern = paste0(kmer, "s_unique.csv")
+  df <- combine_data(data_dir = kmer_dir,
+                     data_pattern = kmer_pattern)
+  plot_counts(df, k=k)
+
+}
+
+# k=15
+# kmer = paste0(k, "mer")
+# kmer_dir = paste0("deBruijn_graphs/oligo/results/", kmer, "/")
+# kmer_pattern = paste0(kmer, "s_unique.csv")
+# df <- combine_data(data_dir = kmer_dir,
+#                    data_pattern = kmer_pattern)
+# plot_counts(df, k=k)
