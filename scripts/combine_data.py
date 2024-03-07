@@ -26,10 +26,16 @@ def get_data(data_dir, k):
     for i in files:
         name = re.search('([^\/]+$)', i)[0]
         meta_data = name.split('_')
-        substrate = '_'.join([meta_data[0], meta_data[1]])
-        condition = meta_data[2]
-        rep = meta_data[3].replace('rep','')
-        k = meta_data[4].replace('mers','')
+        if len(meta_data) != 6:
+            substrate = meta_data[0]
+            condition = meta_data[1]
+            rep = meta_data[2].replace('rep','')
+            k = meta_data[3].replace('mers','')
+        else:
+            substrate = '_'.join([meta_data[0], meta_data[1]])
+            condition = meta_data[2]
+            rep = meta_data[3].replace('rep','')
+            k = meta_data[4].replace('mers','')
         df = pd.read_csv(i)
         df[['substrate','condition','rep','k']] = [substrate, condition, rep, k]
         df_list.append(df)
