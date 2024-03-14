@@ -47,23 +47,25 @@ def format_long(df_list, cutoff=None):
     df_long = pd.concat(df_list).reset_index(drop=True)
     if cutoff:
         df_long = df_long[df_long['count'] >= cutoff]
+    df_long['edge'] = df_long['node1']+df_long['node2'].str.rstrip().str[-1]
+    df_long.drop(['node1', 'node2'], axis=1, inplace=True)
+    df_long = df_long.set_index(['edge']).reset_index()
     return(df_long)
 
 def format_wide(df_long):
     
     print('Converting data to wide format ... ')
     # pivot count data to long format
-    df_wide = df_long.pivot(index=['node1','node2'], columns=['condition','rep'], values='count').reset_index()
+    df_wide = df_long.pivot(index=['edge'], columns=['condition','rep'], values='count').reset_index()
     # flatten multi-index columns
     df_wide.columns = df_wide.columns.map('_'.join).str.strip('_')
     # reorder columns lexicographically
     df_wide = df_wide.reindex(sorted(df_wide.columns), axis=1)
     # move node columns back to front
-    df_wide = df_wide.set_index(['node1','node2']).reset_index()
+    df_wide = df_wide.set_index(['edge']).reset_index()
     # convert floats back to int
     num_cols = df_wide.columns[df_wide.dtypes.eq('float64')]
     df_wide[num_cols] = df_wide[num_cols].fillna(0).astype(int)
-
     return(df_wide)
 
 ''' Main '''
