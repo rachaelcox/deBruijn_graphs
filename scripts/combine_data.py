@@ -78,7 +78,7 @@ def main():
     print(f'Writing long table to {args.out_prefix}_long.csv ...')
     df_long.to_csv(f'{args.out_prefix}_long.csv', index=False)
     print(f'Writing wide table to {args.out_prefix}_wide.csv ...')
-    df_long.to_csv(f'{args.out_prefix}_wide.csv', index=False)
+    df_wide.to_csv(f'{args.out_prefix}_wide.csv', index=False)
     
 
 if __name__ == "__main__":
