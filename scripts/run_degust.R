@@ -144,9 +144,7 @@ confect <- topconfects::limma_confects(fit2, coef=1, fdr=fdr)
 # ** outfile args here
 print("Writing results ...")
 out2 <- cbind(out2, confect=confect$table$confect[order(confect$table$index)])
-out2$confect <- replace_na(0)
 
-out2 %>% arrange(desc(as.numeric(confect))) %>% 
-  write_csv(output_file)
+out2 %>% write_csv(output_file)
 
 print("Done!")
