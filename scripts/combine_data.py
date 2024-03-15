@@ -17,7 +17,7 @@ import pickle
 ''' Functions '''
 def get_data(data_dir, k):
     
-    files = glob.glob(f'{data_dir}/*{k}mer*')
+    files = glob.glob(f'{data_dir}/*_{k}mer*')
     print(f'Files detected:')
     print(files)
     

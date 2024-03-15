@@ -50,11 +50,8 @@ def unique(input_file, output_file, pickle_file, return_ids=False):
         print(id_df)
         id_df.reset_index(inplace=True)
         print(id_df.head())
-        print(id_df[id_df.node_edge=='GYGYQWW'])
-        print(counts['GYGYQWW'])
         ids = id_df.set_index('node_edge')['proteinid'].to_dict()
         print({k: ids[k] for k in list(ids)[:10]})
-        print(ids['GYGYQWW'])
         out_df['proteinid'] = [map_kmer(i, ids) for i in out_df['node_edge']]
         col_order = ['node1', 'node2', 'count', 'proteinid']
     out_df = out_df[col_order]
