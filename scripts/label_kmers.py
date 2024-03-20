@@ -48,6 +48,14 @@ def main():
                     else 'direct oligo match' if edge in direct_kmers \
                     else 'library match' if edge in lib_kmers \
                     else 'no match' for edge in df['edge']])
+
+    if args.remove_lib:
+        print('Removing k-mers matching the library static regions ...')
+        df = df[df['label'] != 'library match']
+        if args.drop_label_col:
+            print('Dropping label column ...')
+            df = df.drop(['label'], axis=1)
+
     print('Writing out results ...')
     df.to_csv(args.outfile, index=False)
     print('Done!')
@@ -65,6 +73,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--bait_file", action="store", required=False,
                         help="(Required) Path to file with oligonucleotide bait k-mers (complementary).")
+
+    parser.add_argument("--remove_lib", action="store_true", required=False, default=False, help="(Optional) Remove library matches from output.")
+
+    parser.add_argument("--drop_label_col", action="store_true", required=False, default=False, help="(Optional) Drop label column from output, i.e., as a follow up to '--remove_lib'")
 
     parser.add_argument("--outfile", action="store", required=False,
                         help="(Required) Outfile path/name (.csv)")
