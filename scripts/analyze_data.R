@@ -35,24 +35,24 @@ combine_data <- function(files, fdr_cutoff){
 # reading in data
 cutoff = 0.10
 
-oligo_1_files <- dir('oligos/results/oligo_1/labeled', pattern='*all_washes_enriched_labeled.csv', full.names=TRUE)
-oligo_2_files <- dir('oligos/results/oligo_2/labeled', pattern='*all_washes_enriched_labeled.csv', full.names=TRUE)
-oligo_3_files <- dir('oligos/results/oligo_3/labeled', pattern='*all_washes_enriched_labeled.csv', full.names=TRUE)
-strep_files <- dir('oligos/results/streptavidin/labeled', pattern='*all_washes_enriched_labeled.csv', full.names=TRUE)
+oligo_1_files <- dir('oligos/results/oligo_1/labeled_nolib', pattern='*all_washes_enriched_nolib_labeled.csv', full.names=TRUE)
+oligo_2_files <- dir('oligos/results/oligo_2/labeled_nolib', pattern='*all_washes_enriched_nolib_labeled.csv', full.names=TRUE)
+oligo_3_files <- dir('oligos/results/oligo_3/labeled_nolib', pattern='*all_washes_enriched_nolib_labeled.csv', full.names=TRUE)
+strep_files <- dir('oligos/results/streptavidin/labeled_nolib', pattern='*all_washes_enriched_nolib_labeled.csv', full.names=TRUE)
 
-oligo_1_data <- combine_data(oligo_1_files, fdr_cutoff = cutoff) #%>%
-  mutate(label = case_when(edge %in% strep_data$edge ~ 'streptavidin match',
+strep_data <- combine_data(strep_files, fdr_cutoff = cutoff)
+oligo_1_data <- combine_data(oligo_1_files, fdr_cutoff = cutoff) %>%
+  mutate(label = case_when(edge %in% strep_data$edge ~ 'streptavidin bound',
                            label == 'no match' ~ 'everything else',
                            TRUE ~ label))
 oligo_2_data <- combine_data(oligo_2_files, fdr_cutoff = cutoff) %>%
-  mutate(label = case_when(edge %in% strep_data$edge ~ 'streptavidin match',
+  mutate(label = case_when(edge %in% strep_data$edge ~ 'streptavidin bound',
                            label == 'no match' ~ 'everything else',
                            TRUE ~ label))
 oligo_3_data <- combine_data(oligo_3_files, fdr_cutoff = cutoff) %>%
-  mutate(label = case_when(edge %in% strep_data$edge ~ 'streptavidin match',
+  mutate(label = case_when(edge %in% strep_data$edge ~ 'streptavidin bound',
                            label == 'no match' ~ 'everything else',
                            TRUE ~ label))
-strep_data <- combine_data(strep_files, fdr_cutoff = cutoff)
 
 
 # plot k-mer count for each label
@@ -84,26 +84,35 @@ strep_data %>%
   scale_fill_manual(values=pal1) +
   labs(title = "streptavidin")
 
-# plot average expression for each label
+# plot log2fc for each label for each k
 oligo_1_data %>%
-  #filter(label != "library match") %>% 
-  ggplot(aes(x = avg_expr, fill = label)) +
-  geom_density(alpha = 0.7) +
-  #scale_fill_manual(values=c(pal1[1],pal1[2],pal1[4],pal1[5])) +
-  scale_fill_manual(values=pal1) +
-  facet_wrap(~kmer_size, ncol=3, scales = "free_y")
+  ggplot(aes(x = as.factor(kmer_size), y = `3w`, fill = label)) +
+  geom_boxplot() +
+  scale_fill_manual(values=pal1)
 
-# ----------------------------
-# archive/testing
-# ----------------------------
-fdr_cutoff = 0.10
-dfo <- read_csv('oligos/results/oligo_3/labeled/oligo_3_7mers_10c_all_washes_enriched_labeled.csv') %>%
-  filter(fdr <= fdr_cutoff)
-dfs <- read_csv('oligos/results/streptavidin/labeled/streptavidin_7mers_10c_all_washes_enriched_labeled.csv') %>%
-  filter(fdr <= fdr_cutoff)
+oligo_2_data %>%
+  ggplot(aes(x = as.factor(kmer_size), y = `3w`, fill = label)) +
+  geom_boxplot() +
+  scale_fill_manual(values=pal1)
 
-targets <- dfo %>%
-  filter(label == "complement oligo match")
+oligo_3_data %>%
+  ggplot(aes(x = as.factor(kmer_size), y = `3w`, fill = label)) +
+  geom_boxplot() +
+  scale_fill_manual(values=pal1)
 
-overlap <- dfo %>%
-  filter(edge %in% dfs$edge)
+# what is unique to each data set?
+#install.packages("ggVennDiagram")
+library(ggVennDiagram)
+k = 10
+oligo_1_k_subset <- oligo_1_data %>% filter(kmer_size == k)
+oligo_2_k_subset <- oligo_2_data %>% filter(kmer_size == k)
+oligo_3_k_subset <- oligo_3_data %>% filter(kmer_size == k)
+strep_k_subset <- strep_data %>% filter(kmer_size == k)
+x <- list(oligo_1 = oligo_1_k_subset$edge, oligo_2 = oligo_2_k_subset$edge, 
+          oligo_3 = oligo_3_k_subset$edge, streptavidin = strep_k_subset$edge)
+ggVennDiagram(x)
+
+ggVennDiagram(x[1:3], color = "black", lwd = 0.8, lty = 1, label = "count") +
+  scale_fill_viridis_c(direction = -1, option = "A")
+
+# compute PCA + plot
