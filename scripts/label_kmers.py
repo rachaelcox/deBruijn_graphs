@@ -33,7 +33,7 @@ def get_library_set(lib_file):
 def main():
 
     t0 = time.time()
-    print('Reading in files ...')
+    print('Reading in library/bait files ...')
     lib_kmers = get_library_set(args.lib_file)
     comp_kmers = get_oligo_set(args.bait_file)
     direct_kmers = []
@@ -42,6 +42,7 @@ def main():
         oligo_kmer = i.complement()
         direct_kmers.append(str(oligo_kmer))
     direct_kmers = set(direct_kmers)
+    print(f'Reading in {args.results_file} ...')
     df = pd.read_csv(args.results_file)
     print('Labeling k-mers ...')
     df['label'] = (['complement oligo match' if edge in comp_kmers \
