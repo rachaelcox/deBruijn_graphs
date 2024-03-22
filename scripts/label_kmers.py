@@ -35,13 +35,19 @@ def main():
     t0 = time.time()
     print('Reading in library/bait files ...')
     lib_kmers = get_library_set(args.lib_file)
-    comp_kmers = get_oligo_set(args.bait_file)
-    direct_kmers = []
-    for i in comp_kmers:
-        i = Seq(i)
-        oligo_kmer = i.complement()
-        direct_kmers.append(str(oligo_kmer))
-    direct_kmers = set(direct_kmers)
+    
+    if args.bait_file:
+        comp_kmers = get_oligo_set(args.bait_file)
+        direct_kmers = []
+        for i in comp_kmers:
+            i = Seq(i)
+            oligo_kmer = i.complement()
+            direct_kmers.append(str(oligo_kmer))
+        direct_kmers = set(direct_kmers)
+    else:
+        comp_kmers = []
+        direct_kmers = []
+    
     print(f'Reading in {args.results_file} ...')
     df = pd.read_csv(args.results_file)
     print('Labeling k-mers ...')
@@ -66,10 +72,10 @@ if __name__ == "__main__":
     """ This is executed when run from the command line """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--results_file", action="store", required=False,
+    parser.add_argument("--results_file", action="store", required=True,
                         help="(Required) Path to file with experimental k-mer counts/enrichment.")
 
-    parser.add_argument("--lib_file", action="store", required=False,
+    parser.add_argument("--lib_file", action="store", required=True,
                         help="(Required) Path to file with library k-mers.")
 
     parser.add_argument("--bait_file", action="store", required=False,
@@ -79,7 +85,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--drop_label_col", action="store_true", required=False, default=False, help="(Optional) Drop label column from output, i.e., as a follow up to '--remove_lib'")
 
-    parser.add_argument("--outfile", action="store", required=False,
+    parser.add_argument("--outfile", action="store", required=True,
                         help="(Required) Outfile path/name (.csv)")
 
     # optional verbosity counter (eg. -v, -vv, -vvv, etc.)
