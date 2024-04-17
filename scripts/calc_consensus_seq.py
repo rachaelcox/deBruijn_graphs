@@ -200,8 +200,14 @@ def main():
     # read in and format data
     dBg_unique = args.input_file
     input_df = pd.read_csv(dBg_unique)
-    cols=['node1','node2','apex_zscore']
+
+    if args.edges:
+        input_df['node1'] = input_df.edge.str.rstrip().str[:-1]
+        input_df['node2'] = input_df.edge.str.rstrip().str[1:]
+
+    cols = ['node1','node2','weight']
     input_df = input_df[cols]
+
     new_col_names = ['Node1','Node2','Weight']
     input_df.columns = new_col_names
     input_df.sort_values('Weight', ascending=False, inplace=True)
@@ -232,6 +238,7 @@ if __name__ == "__main__":
     parser.add_argument("--input_file", action="store", required=True,
                                         help="Filename for unique kmer edge list (.csv)")
     parser.add_argument("--seed_diversity", action="store_true", required=False, default=False, help="(Optional) Use the (1) most lexically diverse and (2) highest weight k-mer as a seed.")
+    parser.add_argument("--edges", action="store_true", required=False, default=False, help="(Optional) Input kmers are in the form of edges")
     parser.add_argument("--calc_n", action="store", required=False, default=None, type=int,
                                         help="(Optional) Number of consensus sequences to generate.")
     parser.add_argument("-o", "--outfile_prefix", action="store", default=None, help="(Optional) Specify the outfile path/name. Default='{input_name}.consensus.fasta'")
