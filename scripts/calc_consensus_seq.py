@@ -219,16 +219,16 @@ def main():
         # for one consensus seq
         cons_seq, sk1, sk2 = calc_consensus_seq(input_df)
         # format new file name & write consensus sequence to output
-        header = f'consensus sequence [{basename}] [seed={sk1[:-1]+sk2[-1]} | rank=1]'
+        header = f'{basename} consensus sequence | len={len(cons_seq)} | seed={sk1[:-1]+sk2[-1]} | rank=1'
         fasta = SeqRecord(Seq(str(cons_seq)), id=header)
     else:
         # for many consensus seqs
         fasta, consensus_df = calc_n_seqs(input_df, args.calc_n, args.seed_diversity)
-        consensus_df.to_csv(f'{outpath+basename}.csv', index=False)
+        consensus_df.to_csv(f'{outpath+basename}_consensus_seqs.csv', index=False)
         for entry in fasta:
-            entry.id = f'consensus sequence [{basename}] {entry.id}'
+            entry.id = f'consensus sequence {basename} | {entry.id}'
     
-    with open(f'{outpath+basename}.fasta', "w") as f:
+    with open(f'{outpath+basename}_consensus_seqs.fasta', "w") as f:
         SeqIO.write(fasta, f, "fasta")
     
 
