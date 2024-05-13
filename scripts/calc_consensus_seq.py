@@ -150,7 +150,7 @@ def calc_n_seqs(input_df, n, seed_div=False):
         rank = idx+1
         seed_kmer_1, seed_kmer_2, score = row[['Node1','Node2','Weight']]
         print(f'{seed_kmer_1} {seed_kmer_2}\trank:{rank}\tscore:{score}')
-        seed_kmer_seq = seed_kmer_1[:-1]+seed_kmer_2[-1]
+        seed_kmer_seq = seed_kmer_1+seed_kmer_2[-1]
         header = f'[seed={seed_kmer_seq} | rank={rank} | score={score}]'
         cons_seq = grow_cons_seq(seed_kmer_1, seed_kmer_2, input_df)
         record = SeqRecord(Seq(str(cons_seq)), id=header)
