@@ -219,7 +219,7 @@ def main():
         # for one consensus seq
         cons_seq, sk1, sk2 = calc_consensus_seq(input_df)
         # format new file name & write consensus sequence to output
-        header = f'{basename} consensus sequence | len={len(cons_seq)} | seed={sk1[:-1]+sk2[-1]} | rank=1'
+        header = f'{basename} consensus sequence | len={len(cons_seq)} | seed={sk1+sk2[-1]} | rank=1'
         fasta = SeqRecord(Seq(str(cons_seq)), id=header)
     else:
         # for many consensus seqs
